@@ -2,8 +2,10 @@ pub mod constants;
 pub mod error;
 
 pub mod query;
-pub mod offering;
 pub mod selector;
+
+pub mod offering;
+pub mod allocation;
 
 pub mod seatfinder;
 
@@ -29,9 +31,16 @@ async fn main() -> WebDriverResult<()> {
 
     match seatfinder.select_unit().await {
         Ok(()) => {},
-        Err(e) => panic!("Error selecting the unit session: {}", e),
+        Err(e) => panic!("Error selecting the unit offering: {}", e),
     }
 
-    seatfinder.driver.quit().await?;
-    Ok(())
+    match seatfinder.search_query(&interactees).await {
+        Ok(o) => match o {
+            Some(allocation) => allocation.notify_query_resolved(seatfinder.config.query.unit_code()),
+            None => seatfinder.notify_no_allocations_found(),
+        }
+        Err(e) => panic!("Error searching for the query: {}", e)
+    }
+
+    Ok(seatfinder.driver.quit().await?)
 }

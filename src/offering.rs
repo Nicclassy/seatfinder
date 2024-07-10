@@ -2,16 +2,20 @@ use std::error::Error;
 
 use thirtyfour::WebElement;
 
-use crate::constants::{UNIT_CODE_FORMAT, SEMESTER_FORMAT, SEMESTER};
+use crate::constants::{SUBCODE_FORMAT, SEMESTER_FORMAT};
+use crate::allocation::Semester;
 use crate::query::FinderQuery;
-use crate::error::{RegexNoMatchError, SemesterInvalidError, OfferingError};
+use crate::error::{ParseError, SemesterInvalidError, OfferingError};
 
 pub(crate) fn maybe_single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<dyn Error>> {
     let Some((_, [unit_code, session])) = 
-        UNIT_CODE_FORMAT.captures(&subcode).map(|caps| caps.extract()) else {
+        SUBCODE_FORMAT.captures(&subcode).map(|caps| caps.extract()) else {
             return Err(
                 Box::new(
-                    RegexNoMatchError(UNIT_CODE_FORMAT.as_str(), subcode.to_string())
+                    ParseError::RegexNoMatchError(
+                        SUBCODE_FORMAT.as_str(), 
+                        subcode.to_string()
+                    )
                 )
             )
     };
@@ -38,7 +42,7 @@ pub(crate) fn maybe_single_offering(query: &FinderQuery, subcode: &String) -> Re
         },
         None => return Err(
             Box::new(
-                RegexNoMatchError(
+                ParseError::RegexNoMatchError(
                     SEMESTER_FORMAT.as_str(), 
                     session.to_string()
                 )
@@ -46,16 +50,13 @@ pub(crate) fn maybe_single_offering(query: &FinderQuery, subcode: &String) -> Re
         )
     };
 
-    let semester = match semester_match.as_str().parse::<u64>() {
-        Ok(semester) => semester,
-        Err(e) => return Err(Box::new(e)),
-    };
+    let semester = Semester::try_from(semester_match.as_str().to_string())?;
 
-    match semester == SEMESTER {
+    match semester == query.semester {
         true => Ok(()),
         false => Err(
             Box::new(
-                SemesterInvalidError { expected: SEMESTER, actual: semester } 
+                SemesterInvalidError { expected: query.semester.clone(), actual: semester } 
             )
         )
     }
