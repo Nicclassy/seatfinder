@@ -1,8 +1,6 @@
 use std::fs::File;
 use std::error::Error;
 use std::io::{self, BufReader};
-use std::thread;
-use std::time::Duration;
 
 use serde_json::{self, Value};
 use thirtyfour::prelude::*;

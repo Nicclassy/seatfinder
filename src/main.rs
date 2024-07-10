@@ -4,6 +4,7 @@ pub mod error;
 pub mod query;
 pub mod offering;
 pub mod selector;
+
 pub mod seatfinder;
 
 use tokio;
