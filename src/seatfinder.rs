@@ -118,8 +118,4 @@ impl SeatFinder {
     async fn query_by_xpath(&self, xpath: XPathStr) -> WebDriverResult<WebElement> {
         self.driver.query(By::XPath(xpath)).first().await
     }
-
-    pub fn wait(&self, seconds: u64) {
-        thread::sleep(Duration::from_secs(seconds));
-    }
 }
