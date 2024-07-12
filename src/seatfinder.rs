@@ -8,7 +8,7 @@ use thirtyfour::prelude::*;
 use crate::constants::CONFIG_FILE;
 use crate::error::OfferingError;
 use crate::query::FinderConfig;
-use crate::offering::{maybe_single_offering, maybe_multiple_offerings};
+use crate::offering::{single_offering, multiple_offerings};
 use crate::allocation::{Allocation, AllocationResult};
 use crate::selector::*;
 
@@ -80,7 +80,7 @@ impl SeatFinder {
         };
 
         if subcodes.len() == 1 {
-            return match maybe_single_offering(&self.config.query, first_offering) {
+            return match single_offering(&self.config.query, first_offering) {
                 Ok(()) => {
                     let parent = selected_results[0].parent().await?;
                     let checkbox = parent.query(By::XPath(OFFERING_CHECKBOX)).first().await?;
@@ -90,9 +90,9 @@ impl SeatFinder {
             }
         }
         
-        match maybe_multiple_offerings(&self.config.query, &subcodes, &selected_results) {
-            Some(element) => {
-                let parent = element.parent().await?;
+        match multiple_offerings(&self.config.query, &subcodes, &selected_results) {
+            Some(event) => {
+                let parent = event.parent().await?;
                 let checkbox = parent.query(By::XPath(OFFERING_CHECKBOX)).first().await?;
                 Ok(checkbox.click().await?)
             }
@@ -107,49 +107,53 @@ impl SeatFinder {
     pub async fn search_query(&self, interactees: &Interactees) -> AllocationResult {
         interactees.show_timetable_button.click().await?;
 
-        let tutorial_xpath = TUTORIAL_ALLOCATION_FORMAT.format_single_u64(self.config.query.day as u64);
-        let events = self.driver
-            .query(By::XPath(tutorial_xpath))
-            .all_from_selector()
-            .await?;
-
-        Ok(self.parse_events(&events).await?)
+        Ok(self.find_matching_event().await?)
     }
 
     pub fn notify_no_allocations_found(&self) {
         println!("No allocations found for {} matching the given query.", self.config.query.unit_code())
     }
 
-    async fn parse_events(&self, timetable_events: &Vec<WebElement>) -> AllocationResult {
-        for event in timetable_events {
-            event.wait_until().enabled().await?;
-            event.wait_until().displayed().await?;
+    async fn find_matching_event(&self) -> AllocationResult {
+        let mut n_parsed_events = 1;
+        let query = &self.config.query;
+        let column = format_u64(ALLOCATION_FORMAT.into(), query.day as u64);
+
+        while let Some(event) = self.find_event(&column, n_parsed_events).await {
             event.click().await?;
-
-            match self.parse_event(event).await? {
-                Some(allocation) => return Ok(Some(allocation)),
-                None => {{}},
-            };
-
+            
+            let allocation = self.try_parse_allocation(&event).await?;
+            if allocation.activity == query.activity_number {
+                return Ok(if allocation.seats > 0 { Some(allocation) } else { None })
+            }
+            
             let go_back_button = self.query_by_xpath(GO_BACK_BUTTON).await?;
             go_back_button.click().await?;
+            n_parsed_events += 1;
         }
 
         Ok(None)
     }
 
-    async fn parse_event(&self, event: &WebElement) -> AllocationResult {
+    async fn try_parse_allocation(&self, event: &WebElement) -> Result<Allocation, Box<dyn Error>> {
         let tabulated_allocation = event
             .query(By::XPath(ALLOCATIONS_TABLE))
             .all_from_selector()
             .await?;
 
         let allocation = Allocation::try_new(&tabulated_allocation).await?;
-        if allocation.seats > 0 { Ok(Some(allocation)) } else { Ok(None) }
+        Ok(allocation)
     }
 
     #[inline]
-    async fn query_by_xpath(&self, xpath: XPathStr) -> WebDriverResult<WebElement> {
+    async fn query_by_xpath(&self, xpath: impl Into<String>) -> WebDriverResult<WebElement> {
         self.driver.query(By::XPath(xpath)).first().await
+    }
+
+    #[inline]
+    async fn find_event(&self, column: &str, row: u64) -> Option<WebElement> {
+        let by = By::XPath(format_u64(&column, row));
+        let event = self.driver.query(by).first().await.ok();
+        event
     }
 }

@@ -7,7 +7,7 @@ use crate::allocation::Semester;
 use crate::query::FinderQuery;
 use crate::error::{ParseError, SemesterInvalidError, OfferingError};
 
-pub(crate) fn maybe_single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<dyn Error>> {
+pub(crate) fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<dyn Error>> {
     let Some((_, [unit_code, session])) = 
         SUBCODE_FORMAT.captures(&subcode).map(|caps| caps.extract()) else {
             return Err(
@@ -62,14 +62,14 @@ pub(crate) fn maybe_single_offering(query: &FinderQuery, subcode: &String) -> Re
     }
 }
 
-pub(crate) fn maybe_multiple_offerings<'a>(
+pub(crate) fn multiple_offerings<'a>(
     query: &FinderQuery, 
     subcodes: &'a Vec<String>, 
     elements: &'a Vec<WebElement>
 ) -> Option<&'a WebElement> {
     let element_position = subcodes
         .iter()
-        .position(|o| maybe_single_offering(query, o).is_ok());
+        .position(|o| single_offering(query, o).is_ok());
 
     match element_position {
         Some(i) => elements.get(i),

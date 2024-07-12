@@ -1,7 +1,12 @@
 use serde_json::{self, Value};
 
 use crate::allocation::{ActivityType, Day, Semester};
-use crate::constants::{PUBLIC_TIMETABLE_EVEN, PUBLIC_TIMETABLE_ODD, SUBCODE_FORMAT, UNIT_CODE_FORMAT};
+use crate::constants::{
+    PUBLIC_TIMETABLE_EVEN, 
+    PUBLIC_TIMETABLE_ODD, 
+    SUBCODE_FORMAT, 
+    UNIT_CODE_FORMAT
+};
 use crate::error::ParseError;
 
 const PORT: &'static str = "port";
@@ -25,12 +30,13 @@ pub struct FinderQuery {
 
 impl FinderQuery {
     pub fn try_new(config: &Value) -> Result<Self, ParseError> {
-        let unit_code = config[UNIT_CODE].as_str().ok_or(ParseError::ParseJsonError)?.to_string();
+        let unit_code = config[UNIT_CODE]
+            .as_str()
+            .ok_or(ParseError::ParseJsonError)?
+            .to_string();
         if !UNIT_CODE_FORMAT.is_match(unit_code.as_str()) {
             return Err(ParseError::RegexNoMatchError(SUBCODE_FORMAT.as_str(), unit_code));
         }
-        
-        println!("unit code is {}", unit_code);
 
         let day = Day::try_from(
             config[DAY]
@@ -38,9 +44,8 @@ impl FinderQuery {
             .ok_or(ParseError::ParseJsonError)?
         )?;
 
-        println!("day is {:?}", day);
         let semester = Semester::try_from(
-            config[SEMESTER].as_str().ok_or(ParseError::ParseJsonError)?.to_string()
+            config[SEMESTER].as_u64().ok_or(ParseError::ParseJsonError)?
         )?;
 
         let activity_type = ActivityType::try_from(
