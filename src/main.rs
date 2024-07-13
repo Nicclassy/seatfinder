@@ -1,24 +1,15 @@
-pub mod constants;
-pub mod error;
-
-pub mod query;
-pub mod selector;
-
-pub mod offering;
-pub mod allocation;
-
-pub mod seatfinder;
-
 use std::time::Instant;
 
 use tokio;
 use thirtyfour::prelude::*;
 
+use seatfinder::seatfinder::SeatFinder;
+
 #[tokio::main]
 async fn main() -> WebDriverResult<()> {
     let start = Instant::now();
 
-    let seatfinder = match seatfinder::SeatFinder::try_new().await {
+    let seatfinder = match SeatFinder::try_new().await {
         Ok(seatfinder) => seatfinder,
         Err(e) => panic!("Error constructing seatfinder: {}", e),
     };

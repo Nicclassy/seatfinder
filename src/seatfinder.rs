@@ -5,7 +5,6 @@ use std::io::BufReader;
 
 use serde_json::{self, Value};
 use thirtyfour::prelude::*;
-use colored::*;
 
 use crate::constants::{ROWS_IN_TABLE, CONFIG_FILE};
 use crate::error::{AllocationError, OfferingError};
@@ -13,45 +12,6 @@ use crate::query::{FinderQuery, FinderConfig};
 use crate::offering::{single_offering, multiple_offerings};
 use crate::allocation::{Allocation, AllocationResult};
 use crate::selector::*;
-
-#[allow(unused_macros)]
-macro_rules! dbg_no_newline {
-    ($e:expr) => {
-        match $e {
-            tmp => {
-                eprint!("[{}:{}]: {} = {:?}", file!(), line!(), stringify!(&$e), &tmp);
-                tmp
-            }
-        }
-    };
-    () => {
-        eprint!("[{}:{}]: ", file!(), line!());
-    }
-}
-
-#[allow(unused_macros)]
-macro_rules! stale {
-    ($e:ident) => {{
-        let element = &$e;
-        let enabled = element.is_enabled().await.unwrap_or(false);
-        let clickable = element.is_clickable().await.unwrap_or(false);
-        let present = element.is_present().await.unwrap();
-
-        let present_line = if present {
-            "present = true".green()
-        } else {
-            "present = false".red()
-        };
-
-        dbg_no_newline!();
-        println!(
-            "[{}]: {}, enabled = {enabled}, clickable = {clickable}", 
-            stringify!($e), 
-            present_line
-        );
-        $e
-    }}
-}
 
 #[derive(Debug)]
 pub struct Interactees {
@@ -71,7 +31,6 @@ impl SeatFinder {
         let file = File::open(CONFIG_FILE)?;
         let reader = BufReader::new(file);
         
-        let _x = "hello".green();
         let json_config: Value = serde_json::from_reader(reader)?;
         let config = FinderConfig::try_new(&json_config)?;
 
