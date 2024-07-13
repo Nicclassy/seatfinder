@@ -21,6 +21,8 @@ pub enum AllocationError {
 pub enum ParseError {
     #[error("an invalid JSON value was encountered")]
     ParseJsonError,
+    #[error("parity must be even or odd")]
+    ParseParityError,
     #[error("day with isoweekday {:?} is invalid; isoweekday must be between 1 and 7", .0)]
     ParseDayIsoError(u64),
     #[error("{:?} is not a day of the week", .0)]
@@ -33,6 +35,8 @@ pub enum ParseError {
     ParseTimeError(String),
     #[error("invalid activity type {:?}", .0)]
     ParseActivityTypeError(String),
+    #[error("an invalid query was encountered.")]
+    ParseQueriesError,
     #[error("regex {:?} did not match {:?}", .0, .1)]
     RegexNoMatchError(&'static str, String),
 }

@@ -17,7 +17,7 @@ const SEMESTER: &'static str = "semester";
 const DAY: &'static str = "day";
 const ACTIVITIY_TYPE: &'static str = "activity_type";
 const ACTIVITY_NUMBER: &'static str = "activity_number";
-const QUERY: &'static str = "query";
+const QUERIES: &'static str = "queries";
 
 #[derive(Debug)]
 pub struct FinderQuery {
@@ -64,7 +64,7 @@ impl FinderQuery {
 pub struct FinderConfig {
     pub port: u64,
     pub public_timetable_url: String,
-    pub query: FinderQuery,
+    pub queries: Vec<FinderQuery>,
 }
 
 impl FinderConfig {
@@ -78,10 +78,20 @@ impl FinderConfig {
         let public_timetable_url = match parity {
             "odd" => PUBLIC_TIMETABLE_ODD.to_owned(),
             "even" => PUBLIC_TIMETABLE_EVEN.to_owned(),
-            _ => return Err(ParseError::ParseJsonError),
+            _ => return Err(ParseError::ParseParityError),
         };
 
-        let query = FinderQuery::try_new(&config[QUERY])?;
-        Ok(Self { port, public_timetable_url, query })
+        let queries: Vec<FinderQuery> = config[QUERIES]
+            .as_array()
+            .ok_or(ParseError::ParseQueriesError)?
+            .into_iter()
+            .map(FinderQuery::try_new)
+            .collect::<Result<_, _>>()?;
+
+        Ok(Self { port, public_timetable_url, queries })
+    }
+
+    pub fn public_timetable_url(&self) -> String {
+        self.public_timetable_url.clone()
     }
 }

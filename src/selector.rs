@@ -1,12 +1,14 @@
 pub static SEARCH_BAR: XPathStr = XPathStr(r#"//*[@id="search_box"]"#);
 pub static SEARCH_BUTTON: XPathStr = XPathStr(r#"//*[@id="search-form"]/input"#);
 pub static SHOW_TIMETABLE: XPathStr = XPathStr(r#"//*[@id="toggle-right-col-btn"]"#);
+pub static CLEAR_BUTTON: XPathStr = XPathStr(r#"//*[@id="clear-selected-btn"]"#);
 
 pub static UNIT_OFFERINGS: XPathStr = XPathStr(r#"//*[@id="selected-results"]/li/strong"#);
 pub static OFFERING_CHECKBOX: XPathStr = XPathStr(r#"//*[@id="selected-results"]/li/input"#);
 
 pub static ALLOCATION_FORMAT: XPathStr = XPathStr(r#"//*[@id="timetable-grid"]/div[4]/div[{}]/div[{}]"#);
-pub static ALLOCATIONS_TABLE: XPathStr = XPathStr(r#"//*[@id="activity-details-tpl"]/div[2]/div[4]/table/tbody/*"#);
+pub static ALLOCATIONS_TABLE: XPathStr = XPathStr(r#"//*[@id="activity-details-tpl"]/div[2]/div[4]/table"#);
+pub static ALLOCATION_TABLE_ROWS: XPathStr = XPathStr(r#"//*[@id="activity-details-tpl"]/div[2]/div[4]/table/tbody/*"#);
 pub static GO_BACK_BUTTON: XPathStr = XPathStr(r#"//*[@id="activity-details-tpl"]/div[2]/div[6]/button[1]"#);
 
 #[derive(Clone, Copy)]
@@ -18,8 +20,8 @@ impl Into<String> for XPathStr {
     }
 }
 
-impl Into<&str> for XPathStr {
-    fn into(self) -> &'static str {
+impl XPathStr {
+    pub fn as_str(&self) -> &'static str {
         self.0
     }
 }

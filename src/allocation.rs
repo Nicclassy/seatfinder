@@ -1,13 +1,10 @@
 use std::error::Error;
 use std::collections::HashMap;
 
-use strum::{Display, IntoStaticStr};
-use thirtyfour::prelude::*;
+use strum::Display;
 
-use crate::constants::SEMESTER_TABLE_FORMAT;
+use crate::constants::SEMESTER_KEY_FORMAT;
 use crate::error::{AllocationError, ParseError};
-
-const ALLOCATION_TABLE_ROWS: u8 = 12;
 
 pub type AllocationResult = Result<Option<Allocation>, Box<dyn Error>>;
 
@@ -54,7 +51,7 @@ impl TryFrom<String> for Semester {
             Err(_) => {{}},
         }
         
-        let Some(caps) = SEMESTER_TABLE_FORMAT.captures(&value) else {
+        let Some(caps) = SEMESTER_KEY_FORMAT.captures(&value) else {
             return Err(ParseError::ParseSemesterStrError(value));
         };
 
@@ -73,12 +70,24 @@ impl TryFrom<String> for Semester {
     }
 }
 
-#[derive(Debug, IntoStaticStr)]
+#[derive(Debug)]
 pub enum ActivityType {
+    Assesment,
+    CompulsoryLecture,
+    Fieldwork,
+    Film,
     Lab,
+    Lecture,
+    Online,
+    OnlineLive,
+    Optional,
+    Other,
+    Practical,
+    Presentation,
+    Seminar,
+    Studio,
     Tutorial,
     Workshop,
-    Practical,
 }
 
 impl TryFrom<&str> for ActivityType {
@@ -86,14 +95,26 @@ impl TryFrom<&str> for ActivityType {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
+            "Assesment" => Ok(ActivityType::Assesment),
+            "Compulsory Lecture" => Ok(ActivityType::CompulsoryLecture),
+            "Fieldwork" => Ok(ActivityType::Fieldwork),
+            "Film" => Ok(ActivityType::Film),
             "Lab" => Ok(ActivityType::Lab),
+            "Lecture" => Ok(ActivityType::Lecture),
+            "Online" => Ok(ActivityType::Online),
+            "Online (live)" => Ok(ActivityType::OnlineLive),
+            "Optional" => Ok(ActivityType::Optional),
+            "Other" => Ok(ActivityType::Other),
+            "Practical" => Ok(ActivityType::Practical),
+            "Presentation" => Ok(ActivityType::Presentation),
+            "Seminar" => Ok(ActivityType::Seminar),
+            "Studio" => Ok(ActivityType::Studio),
             "Tutorial" => Ok(ActivityType::Tutorial),
             "Workshop" => Ok(ActivityType::Workshop),
-            "Practical" => Ok(ActivityType::Practical),
             _ => Err(ParseError::ParseActivityTypeError(value.to_string())),
         }
     }
-} 
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Day {
@@ -164,50 +185,31 @@ fn allocation_table_get(map: &HashMap<String, String>, key: &str) -> Result<Stri
 }
 
 impl Allocation {
-    pub async fn try_new(table_rows: &Vec<WebElement>) -> Result<Allocation, Box<dyn Error>> {
-        if table_rows.len() != ALLOCATION_TABLE_ROWS as usize {
-            panic!("expected {} elements got {}", ALLOCATION_TABLE_ROWS as usize, table_rows.len());
-        }
-
-        let mut mapped_rows: HashMap<String, String> = HashMap::new();
-        for row in table_rows {
-            let children = row
-                .query(By::Css("*"))
-                .all_from_selector()
-                .await?;
-
-            if children.len() < 2 {
-                return Err(Box::new(AllocationError::TableSizeError));
-            }
-            let table_key = children[0].text().await?;
-            let allocation_value = children[1].text().await?;
-            mapped_rows.insert(table_key, allocation_value);
-        }
-
+    pub async fn try_new(table: &HashMap<String, String>) -> Result<Allocation, Box<dyn Error>> {
         let activity_type = ActivityType::try_from(
-            allocation_table_get(&mapped_rows, "Activity Type")?.as_str()
+            allocation_table_get(&table, "Activity Type")?.as_str()
         )?;
 
-        let group = allocation_table_get(&mapped_rows, "Group")?;
-        let activity = allocation_table_get(&mapped_rows, "Activity")?.parse::<u64>()?;
-        let description = allocation_table_get(&mapped_rows, "Description")?;
+        let group = allocation_table_get(&table, "Group")?;
+        let activity = allocation_table_get(&table, "Activity")?.parse::<u64>()?;
+        let description = allocation_table_get(&table, "Description")?;
 
         let day = Day::try_from(
-            allocation_table_get(&mapped_rows, "Day")?.as_str()
+            allocation_table_get(&table, "Day")?.as_str()
         )?;
-        let time_string = allocation_table_get(&mapped_rows, "Time")?.to_string();
+        let time_string = allocation_table_get(&table, "Time")?.to_string();
         let time = TwentyFourHourTime::new(time_string.clone())
             .ok_or(ParseError::ParseTimeError(time_string))?;
 
         let semester = Semester::try_from(
-            allocation_table_get(&mapped_rows, "Semester")?
+            allocation_table_get(&table, "Semester")?
         )?;
-        let campus = allocation_table_get(&mapped_rows, "Campus")?;
-        let location = allocation_table_get(&mapped_rows, "Location")?;
+        let campus = allocation_table_get(&table, "Campus")?;
+        let location = allocation_table_get(&table, "Location")?;
 
-        let duration = allocation_table_get(&mapped_rows, "Duration")?;
-        let weeks = allocation_table_get(&mapped_rows, "Weeks")?;
-        let seats = allocation_table_get(&mapped_rows, "Seats")?.parse::<u16>()?;
+        let duration = allocation_table_get(&table, "Duration")?;
+        let weeks = allocation_table_get(&table, "Weeks")?;
+        let seats = allocation_table_get(&table, "Seats")?.parse::<u16>()?;
 
         Ok(Allocation {
             activity_type,

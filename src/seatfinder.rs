@@ -1,16 +1,57 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::error::Error;
 use std::io::BufReader;
 
 use serde_json::{self, Value};
 use thirtyfour::prelude::*;
+use colored::*;
 
-use crate::constants::CONFIG_FILE;
-use crate::error::OfferingError;
-use crate::query::FinderConfig;
+use crate::constants::{ROWS_IN_TABLE, CONFIG_FILE};
+use crate::error::{AllocationError, OfferingError};
+use crate::query::{FinderQuery, FinderConfig};
 use crate::offering::{single_offering, multiple_offerings};
 use crate::allocation::{Allocation, AllocationResult};
 use crate::selector::*;
+
+#[allow(unused_macros)]
+macro_rules! dbg_no_newline {
+    ($e:expr) => {
+        match $e {
+            tmp => {
+                eprint!("[{}:{}]: {} = {:?}", file!(), line!(), stringify!(&$e), &tmp);
+                tmp
+            }
+        }
+    };
+    () => {
+        eprint!("[{}:{}]: ", file!(), line!());
+    }
+}
+
+#[allow(unused_macros)]
+macro_rules! stale {
+    ($e:ident) => {{
+        let element = &$e;
+        let enabled = element.is_enabled().await.unwrap_or(false);
+        let clickable = element.is_clickable().await.unwrap_or(false);
+        let present = element.is_present().await.unwrap();
+
+        let present_line = if present {
+            "present = true".green()
+        } else {
+            "present = false".red()
+        };
+
+        dbg_no_newline!();
+        println!(
+            "[{}]: {}, enabled = {enabled}, clickable = {clickable}", 
+            stringify!($e), 
+            present_line
+        );
+        $e
+    }}
+}
 
 #[derive(Debug)]
 pub struct Interactees {
@@ -30,6 +71,7 @@ impl SeatFinder {
         let file = File::open(CONFIG_FILE)?;
         let reader = BufReader::new(file);
         
+        let _x = "hello".green();
         let json_config: Value = serde_json::from_reader(reader)?;
         let config = FinderConfig::try_new(&json_config)?;
 
@@ -40,25 +82,60 @@ impl SeatFinder {
         Ok(Self { driver, config })
     }
 
+    pub async fn seatfind(&self) {    
+        let queries = &self.config.queries;
+        for query in queries.iter() {
+            let interactees = match self.locate_interactees().await {
+                Ok(interactees) => interactees,
+                Err(e) => panic!("Error searching for units: {}", e),
+            };
+
+            if let Err(e) = self.search_timetable(&interactees, query).await {
+                panic!("Error searching the timetable: {}", e);
+            }
+        
+            if let Err(e) = self.select_unit(query).await {
+                panic!("Error selecting the unit offering: {}", e);
+            }
+        
+            match self.search_query(&interactees, query).await {
+                Ok(o) => match o {
+                    Some(allocation) => allocation.notify_query_resolved(query.unit_code()),
+                    None => self.notify_no_allocations_found(query),
+                }
+                Err(e) => panic!("Error searching for the query: {}", e)
+            }
+
+            if let Err(e) = self.clear_timetable().await {
+                panic!("Error clearing the timetable: {}", e);
+            }
+        }
+    }
+
     pub async fn locate_interactees(&self) -> WebDriverResult<Interactees> {
-        self.driver.goto(self.config.public_timetable_url.clone()).await?;
+        self.driver.goto(&self.config.public_timetable_url).await?;
 
         let search_bar = self.query_by_xpath(SEARCH_BAR).await?;
         let search_button = self.query_by_xpath(SEARCH_BUTTON).await?;
         let show_timetable_button = self.query_by_xpath(SHOW_TIMETABLE).await?;
 
-        Ok(Interactees { search_bar, search_button, show_timetable_button })
+        Ok(Interactees { 
+            search_bar, 
+            search_button, 
+            show_timetable_button, 
+        })
     }
 
-    pub async fn search_timetable(&self, interactees: &Interactees) -> WebDriverResult<()> {
-        interactees.search_bar.send_keys(&self.config.query.unit_code).await?;
+    pub async fn search_timetable(&self, interactees: &Interactees, query: &FinderQuery) -> WebDriverResult<()> {
+        interactees.search_bar.clear().await?;
+        interactees.search_bar.send_keys(&query.unit_code).await?;
         interactees.search_button.wait_until().clickable().await?;
         interactees.search_button.click().await?;
 
         Ok(())
     }
 
-    pub async fn select_unit(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn select_unit(&self, query: &FinderQuery) -> Result<(), Box<dyn Error>> {
         let selected_results = self.driver
             .query(By::XPath(UNIT_OFFERINGS))
             .all_from_selector()
@@ -74,13 +151,13 @@ impl SeatFinder {
             Some(offering) => offering,
             None => return Err(
                 Box::new(
-                    OfferingError::NoOfferingsFoundError(self.config.query.unit_code())
+                    OfferingError::NoOfferingsFoundError(query.unit_code())
                 )
             ),
         };
 
         if subcodes.len() == 1 {
-            return match single_offering(&self.config.query, first_offering) {
+            return match single_offering(query, first_offering) {
                 Ok(()) => {
                     let parent = selected_results[0].parent().await?;
                     let checkbox = parent.query(By::XPath(OFFERING_CHECKBOX)).first().await?;
@@ -90,7 +167,7 @@ impl SeatFinder {
             }
         }
         
-        match multiple_offerings(&self.config.query, &subcodes, &selected_results) {
+        match multiple_offerings(query, &subcodes, &selected_results) {
             Some(event) => {
                 let parent = event.parent().await?;
                 let checkbox = parent.query(By::XPath(OFFERING_CHECKBOX)).first().await?;
@@ -98,50 +175,84 @@ impl SeatFinder {
             }
             None => Err(
                 Box::new(
-                    OfferingError::NoValidOfferingsFoundError(self.config.query.unit_code())
+                    OfferingError::NoValidOfferingsFoundError(query.unit_code())
                 )
             )
         }
     }
 
-    pub async fn search_query(&self, interactees: &Interactees) -> AllocationResult {
+    pub async fn search_query(&self, interactees: &Interactees, query: &FinderQuery) -> AllocationResult {
         interactees.show_timetable_button.click().await?;
 
-        Ok(self.find_matching_event().await?)
+        Ok(self.find_matching_event(query).await?)
     }
 
-    pub fn notify_no_allocations_found(&self) {
-        println!("No allocations found for {} matching the given query.", self.config.query.unit_code())
+    pub fn notify_no_allocations_found(&self, query: &FinderQuery) {
+        println!("No allocations found for {} matching the given query.", query.unit_code())
     }
 
-    async fn find_matching_event(&self) -> AllocationResult {
-        let mut n_parsed_events = 1;
-        let query = &self.config.query;
-        let column = format_u64(ALLOCATION_FORMAT.into(), query.day as u64);
+    async fn find_matching_event(&self, query: &FinderQuery) -> AllocationResult {
+        let mut timetable_row = 1;
+        let table_column = format_u64(ALLOCATION_FORMAT.as_str(), query.day as u64);
 
-        while let Some(event) = self.find_event(&column, n_parsed_events).await {
+        while let Ok(ref event) = self.find_event(&table_column, timetable_row).await {
             event.click().await?;
             
-            let allocation = self.try_parse_allocation(&event).await?;
+            let allocation = self.allocation_from_table(&table_column, timetable_row).await?;
             if allocation.activity == query.activity_number {
                 return Ok(if allocation.seats > 0 { Some(allocation) } else { None })
             }
             
-            let go_back_button = self.query_by_xpath(GO_BACK_BUTTON).await?;
-            go_back_button.click().await?;
-            n_parsed_events += 1;
+            self.go_back_to_timetable().await?;
+            timetable_row += 1;
         }
 
         Ok(None)
     }
 
-    async fn try_parse_allocation(&self, event: &WebElement) -> Result<Allocation, Box<dyn Error>> {
-        let tabulated_allocation = event
-            .query(By::XPath(ALLOCATIONS_TABLE))
-            .all_from_selector()
-            .await?;
+    async fn allocation_from_table(&self, column: &str, row: u64) -> Result<Allocation, Box<dyn Error>> {
+        let mut allocation_table = HashMap::new();
+        let mut table_rows = self.table_rows().await?; 
+        
+        let mut table_row_number = 0;
+        while table_row_number < ROWS_IN_TABLE {
+            let table_row = &table_rows[table_row_number];
+            let children = table_row
+                .query(By::Css("*"))
+                .all_from_selector()
+                .await;
 
-        let allocation = Allocation::try_new(&tabulated_allocation).await?;
+            let reload_table = match children {
+                Ok(children) if children.len() == 2 => {
+                    let first = children[0].text().await;
+                    let second = children[1].text().await;
+                    match (first, second) {
+                        (Ok(table_key), Ok(table_value)) => {
+                            allocation_table.insert(table_key, table_value);
+                            false
+                        }
+                        _ => true,
+                    }
+                },
+                Ok(_) => return Err(Box::new(AllocationError::TableSizeError)),
+                Err(_) => true,
+            };
+
+            if reload_table {
+                self.go_back_to_timetable().await?;
+                let event = self.find_event(&column, row).await?;
+                event.click().await?;
+                table_rows = self.table_rows().await?;
+            } else {
+                table_row_number += 1
+            }
+        }
+
+        if allocation_table.len() != ROWS_IN_TABLE {
+            return Err(Box::new(AllocationError::TableSizeError));
+        }
+
+        let allocation = Allocation::try_new(&allocation_table).await?;
         Ok(allocation)
     }
 
@@ -150,10 +261,27 @@ impl SeatFinder {
         self.driver.query(By::XPath(xpath)).first().await
     }
 
+    async fn clear_timetable(&self) -> WebDriverResult<()> {
+        let clear_button = self.query_by_xpath(CLEAR_BUTTON).await?;
+        Ok(clear_button.click().await?)
+    }
+
+    async fn go_back_to_timetable(&self) -> WebDriverResult<()> {
+        let go_back_button = self.query_by_xpath(GO_BACK_BUTTON).await?;
+        Ok(go_back_button.click().await?)
+    }
+
     #[inline]
-    async fn find_event(&self, column: &str, row: u64) -> Option<WebElement> {
+    async fn table_rows(&self) -> WebDriverResult<Vec<WebElement>> {
+        self.driver
+            .query(By::XPath(ALLOCATION_TABLE_ROWS))
+            .all_from_selector()
+            .await
+    }
+
+    #[inline]
+    async fn find_event(&self, column: &str, row: u64) -> WebDriverResult<WebElement> {
         let by = By::XPath(format_u64(&column, row));
-        let event = self.driver.query(by).first().await.ok();
-        event
+        self.driver.query(by).first().await
     }
 }
