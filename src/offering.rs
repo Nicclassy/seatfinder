@@ -5,7 +5,7 @@ use thirtyfour::WebElement;
 use crate::constants::{SUBCODE_FORMAT, SEMESTER_FORMAT};
 use crate::allocation::Semester;
 use crate::query::FinderQuery;
-use crate::error::{ParseError, SemesterInvalidError, OfferingError};
+use crate::error::{ParseError, OfferingError};
 
 pub(crate) fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<dyn Error>> {
     let Some((_, [unit_code, session])) = 
@@ -56,7 +56,7 @@ pub(crate) fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(
         true => Ok(()),
         false => Err(
             Box::new(
-                SemesterInvalidError { 
+                OfferingError::SemesterInvalidError { 
                     expected: query.semester.clone(), 
                     actual: semester 
                 } 

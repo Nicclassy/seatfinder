@@ -19,7 +19,7 @@ const UNIT_CODE: &'static str = "unit_code";
 const SEMESTER: &'static str = "semester";
 const DAY: &'static str = "day";
 const ACTIVITIY_TYPE: &'static str = "activity_type";
-const ACTIVITY_NUMBER: &'static str = "activity_number";
+const ACTIVITY: &'static str = "activity";
 const QUERIES: &'static str = "queries";
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ pub struct FinderQuery {
     pub semester: Semester,
     pub day: Day,
     pub activity_type: ActivityType,
-    pub activity_number: u64,
+    pub activity: u64,
 }
 
 impl FinderQuery {
@@ -40,12 +40,13 @@ impl FinderQuery {
         if !UNIT_CODE_FORMAT.is_match(unit_code.as_str()) {
             return Err(ParseError::RegexNoMatchError(SUBCODE_FORMAT.as_str(), unit_code));
         }
-
-        let day = Day::try_from(
-            config[DAY]
-            .as_u64()
-            .ok_or(ParseError::ParseJsonError)?
-        )?;
+        let day = match config[DAY].as_u64() {
+            Some(value) => Day::try_from(value)?,
+            None => match config[DAY].as_str() {
+                Some(value) => Day::try_from(value)?,
+                None => return Err(ParseError::ParseJsonError),
+            }
+        };
 
         let semester = match config[SEMESTER].as_u64() {
             Some(semester) => Semester::try_from(semester)?,
@@ -55,8 +56,15 @@ impl FinderQuery {
         let activity_type = ActivityType::try_from(
             config[ACTIVITIY_TYPE].as_str().ok_or(ParseError::ParseJsonError)?
         )?;
-        let activity_number = config[ACTIVITY_NUMBER].as_u64().ok_or(ParseError::ParseJsonError)?;
-        Ok(FinderQuery { unit_code, day, semester, activity_type, activity_number })
+        let activity_number = config[ACTIVITY].as_u64().ok_or(ParseError::ParseJsonError)?;
+
+        Ok(FinderQuery { 
+            unit_code, 
+            day, 
+            semester, 
+            activity_type, 
+            activity: activity_number 
+        })
     }
 
     pub fn unit_code(&self) -> String {

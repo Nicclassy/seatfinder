@@ -3,13 +3,6 @@ use thiserror::Error;
 use crate::allocation::Semester;
 
 #[derive(Error, Debug)]
-#[error("expected semester {expected}, found semester {actual}")]
-pub struct SemesterInvalidError {
-    pub expected: Semester,
-    pub actual: Semester,
-}
-
-#[derive(Error, Debug)]
 pub enum AllocationError {
     #[error("value for key {:?} not found in allocation table", .0)]
     TableRowNotFoundError(String),
@@ -45,6 +38,8 @@ pub enum ParseError {
 pub enum OfferingError {
     #[error("offering {:?} in semester {:?} is improperly formatted", .0, .1)]
     SemesterFormatError(String, String),
+    #[error("expected semester {expected}, found semester {actual}")]
+    SemesterInvalidError { expected: Semester, actual: Semester },
     #[error("no sessions found for {:?}", .0)]
     NoOfferingsFoundError(String),
     #[error("no valid sessions found for {:?}", .0)]
