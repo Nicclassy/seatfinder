@@ -1,0 +1,109 @@
+use std::error::Error;
+use std::collections::HashMap;
+
+use thirtyfour::prelude::*;
+
+use crate::constants::ROWS_IN_TABLE;
+use crate::error::AllocationError;
+use crate::query::FinderQuery;
+use crate::allocation::{Allocation, AllocationResult};
+use crate::selector::*;
+
+pub struct TimetableSearcher<'a> {
+    driver: &'a WebDriver,
+    query: &'a FinderQuery
+}
+
+impl<'a> TimetableSearcher<'a> {
+    pub fn new(driver: &'a WebDriver, query: &'a FinderQuery) -> Self {
+        Self { driver, query }
+    }
+
+    pub async fn search(&self) -> AllocationResult {
+        let mut timetable_row = 1;
+        let timetable_column = format_u64(ALLOCATION_FORMAT.as_str(), self.query.day as u64);
+
+        while let Ok(ref event) = self.timetabled_event(&timetable_column, timetable_row).await {
+            event.click().await?;
+            
+            let allocation = self.allocation_from_table(&timetable_column, timetable_row).await?;
+            if allocation.activity == self.query.activity {
+                return Ok(if allocation.seats > 0 { Some(allocation) } else { None })
+            }
+            
+            self.go_back_to_timetable().await?;
+            timetable_row += 1;
+        }
+
+        Ok(None)
+    }
+
+    async fn allocation_from_table(&self, timetable_column: &str, timetable_row: u64) -> Result<Allocation, Box<dyn Error>> {
+        let mut allocation_table = HashMap::with_capacity(ROWS_IN_TABLE);
+        let mut table_rows = self.table_rows().await?; 
+        
+        let mut table_row_number = 0;
+        while table_row_number < ROWS_IN_TABLE {
+            let table_row = &table_rows[table_row_number];
+            let children = table_row
+                .query(By::Css("*"))
+                .all_from_selector()
+                .await;
+
+            let reload_table = match children {
+                Ok(children) if children.len() == 2 => {
+                    let first = children[0].text().await;
+                    let second = children[1].text().await;
+                    match (first, second) {
+                        (Ok(table_key), Ok(table_value)) => {
+                            allocation_table.insert(table_key, table_value);
+                            false
+                        }
+                        _ => true,
+                    }
+                },
+                Ok(_) => return Err(Box::new(AllocationError::TableSizeError)),
+                Err(_) => true,
+            };
+
+            if reload_table {
+                // Reload in case of a stale element
+                self.go_back_to_timetable().await?;
+                let event = self.timetabled_event(&timetable_column, timetable_row).await?;
+                event.click().await?;
+                table_rows = self.table_rows().await?;
+            } else {
+                table_row_number += 1
+            }
+        }
+
+        if allocation_table.len() != ROWS_IN_TABLE {
+            return Err(Box::new(AllocationError::TableSizeError));
+        }
+
+        let allocation = Allocation::try_new(&allocation_table).await?;
+        Ok(allocation)
+    }
+
+    async fn go_back_to_timetable(&self) -> WebDriverResult<()> {
+        let go_back_button = self.driver
+            .query(By::XPath(GO_BACK_BUTTON))
+            .first()
+            .await?;
+        Ok(go_back_button.click().await?)
+    }
+
+    #[inline]
+    async fn timetabled_event(&self, timetable_column: &str, timetable_row: u64) -> WebDriverResult<WebElement> {
+        let by = By::XPath(format_u64(&timetable_column, timetable_row));
+        self.driver.query(by).first().await
+    }
+
+    #[inline]
+    async fn table_rows(&self) -> WebDriverResult<Vec<WebElement>> {
+        self.driver
+            .query(By::XPath(ALLOCATION_TABLE_ROWS))
+            .all_from_selector()
+            .await
+    }
+}
