@@ -8,8 +8,12 @@ lazy_static!{
     pub static ref SEMESTER_KEY_FORMAT: Regex = Regex::new(r"Semester (\d+)").unwrap();
 }
 
+pub const DEFAULT_PORT: u64 = 7777;
+pub const MIN_PORT: u64 = 1024;
+pub const MAX_PORT: u64 = 65535;
+
 pub const CONFIG_FILE: &'static str = "config.json";
 pub const ROWS_IN_TABLE: usize = 12;
-// chromedriver --port={port}
+
 pub const PUBLIC_TIMETABLE_ODD: &'static str = "https://timetable.sydney.edu.au/odd/timetable/#subjects";
 pub const PUBLIC_TIMETABLE_EVEN: &'static str = "https://timetable.sydney.edu.au/even/timetable/#subjects";

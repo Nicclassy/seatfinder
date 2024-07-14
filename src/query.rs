@@ -2,6 +2,9 @@ use serde_json::{self, Value};
 
 use crate::allocation::{ActivityType, Day, Semester};
 use crate::constants::{
+    DEFAULT_PORT, 
+    MIN_PORT,
+    MAX_PORT, 
     PUBLIC_TIMETABLE_EVEN, 
     PUBLIC_TIMETABLE_ODD, 
     SUBCODE_FORMAT, 
@@ -69,8 +72,8 @@ pub struct FinderConfig {
 
 impl FinderConfig {
     pub fn try_new(config: &Value) -> Result<Self, ParseError> {
-        let port = config[PORT].as_u64().ok_or(ParseError::ParseJsonError)?;
-        if port < 1024 || port > 65535 {
+        let port = config[PORT].as_u64().unwrap_or(DEFAULT_PORT);
+        if port < MIN_PORT || port > MAX_PORT {
             return Err(ParseError::ParseJsonError);
         }
 
@@ -89,9 +92,5 @@ impl FinderConfig {
             .collect::<Result<_, _>>()?;
 
         Ok(Self { port, public_timetable_url, queries })
-    }
-
-    pub fn public_timetable_url(&self) -> String {
-        self.public_timetable_url.clone()
     }
 }
