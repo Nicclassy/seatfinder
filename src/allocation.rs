@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::collections::HashMap;
 
-use strum::Display;
+use strum::{Display, IntoStaticStr};
 
 use crate::constants::SEMESTER_KEY_FORMAT;
 use crate::error::{AllocationError, ParseError};
@@ -26,6 +26,7 @@ impl TwentyFourHourTime {
 
 #[derive(Debug, Display, PartialEq, Clone)]
 pub enum Semester {
+    Any = 0,
     One = 1,
     Two = 2,
 }
@@ -35,6 +36,7 @@ impl TryFrom<u64> for Semester {
 
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         match value {
+            0 => Ok(Self::Any),
             1 => Ok(Self::One),
             2 => Ok(Self::Two),
             _ => Err(ParseError::ParseSemesterError(value))
@@ -55,22 +57,16 @@ impl TryFrom<String> for Semester {
             return Err(ParseError::ParseSemesterStrError(value));
         };
 
-        let semester_number = match (&caps[1]).parse::<u64>() {
-            Ok(semester_number) => semester_number,
-            Err(e) => return Err(
+        match (&caps[1]).parse::<u64>() {
+            Ok(semester) => Self::try_from(semester),
+            Err(e) => Err(
                 ParseError::ParseSemesterStrError(e.to_string())
             ),
-        };
-
-        match semester_number {
-            1 => Ok(Self::One),
-            2 => Ok(Self::Two),
-            _ => Err(ParseError::ParseSemesterError(semester_number))
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(IntoStaticStr, Debug, Clone, Copy)]
 pub enum ActivityType {
     Assesment,
     CompulsoryLecture,
@@ -116,6 +112,16 @@ impl TryFrom<&str> for ActivityType {
     }
 }
 
+impl ActivityType {
+    pub fn checkbox_id_suffix(&self) -> &'static str {
+        match self {
+            Self::CompulsoryLecture => "Compulsory Lecture",
+            Self::OnlineLive => "Online (live)",
+            _ => self.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum Day {
     Monday = 1,
@@ -149,13 +155,13 @@ impl TryFrom<&str> for Day {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "Mon" => Ok(Day::Monday),
-            "Tue" => Ok(Day::Tuesday),
-            "Wed" => Ok(Day::Wednesday),
-            "Thu" => Ok(Day::Thursday),
-            "Fri" => Ok(Day::Friday),
-            "Sat" => Ok(Day::Saturday),
-            "Sun" => Ok(Day::Sunday),
+            "Monday"    | "Mon" => Ok(Day::Monday),
+            "Tuesday"   | "Tue" => Ok(Day::Tuesday),
+            "Wednesday" | "Wed" => Ok(Day::Wednesday),
+            "Thursday"  | "Thu" => Ok(Day::Thursday),
+            "Friday"    | "Fri" => Ok(Day::Friday),
+            "Saturday"  | "Sat" => Ok(Day::Saturday),
+            "Sunday"    | "Sun" => Ok(Day::Sunday),
             _ => Err(ParseError::ParseDayStrError(value.to_string())),
         }
     }

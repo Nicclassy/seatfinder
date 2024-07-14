@@ -48,5 +48,5 @@ pub enum OfferingError {
     #[error("no sessions found for {:?}", .0)]
     NoOfferingsFoundError(String),
     #[error("no valid sessions found for {:?}", .0)]
-    NoValidOfferingsFoundError(String),
+    NoValidOfferingsError(String),
 }

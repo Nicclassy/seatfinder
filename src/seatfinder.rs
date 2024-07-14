@@ -29,6 +29,13 @@ pub struct SeatFinder {
 }
 
 impl SeatFinder {
+    pub async fn new() -> Self {
+        match SeatFinder::try_new().await {
+            Ok(seatfinder) => seatfinder,
+            Err(e) => panic!("Error constructing seatfinder: {}", e),
+        }
+    }
+
     pub async fn try_new() -> Result<Self, Box<dyn Error>> {
         let file = File::open(CONFIG_FILE)?;
         let reader = BufReader::new(file);
@@ -58,6 +65,10 @@ impl SeatFinder {
                 Err(e) => panic!("Error searching for units: {}", e),
             };
 
+            if let Err(e) = self.toggle_advanced_filter(query).await {
+                panic!("Error toggling advanced filter: {}", e);
+            }
+
             if let Err(e) = self.search_timetable(&interactees, query).await {
                 panic!("Error searching the timetable: {}", e);
             }
@@ -74,7 +85,7 @@ impl SeatFinder {
                 Err(e) => panic!("Error searching for the query: {}", e)
             }
 
-            if let Err(e) = self.clear_timetable().await {
+            if let Err(e) = self.reset_timetable().await {
                 panic!("Error clearing the timetable: {}", e);
             }
         }
@@ -94,13 +105,25 @@ impl SeatFinder {
         })
     }
 
+    pub async fn toggle_advanced_filter(&self, query: &FinderQuery) -> WebDriverResult<()> {
+        let checkbox_id = format_str(
+            ACTIVITY_CHECKBOX_FORMAT.as_str(), 
+            query.activity_type.checkbox_id_suffix()
+        );
+        let by = By::Id(checkbox_id);
+        
+        let activity_checkbox = self.driver
+            .query(by)
+            .first()
+            .await?;
+        Ok(activity_checkbox.click().await?)
+    }
+
     pub async fn search_timetable(&self, interactees: &Interactees, query: &FinderQuery) -> WebDriverResult<()> {
         interactees.search_bar.clear().await?;
         interactees.search_bar.send_keys(&query.unit_code).await?;
         interactees.search_button.wait_until().clickable().await?;
-        interactees.search_button.click().await?;
-
-        Ok(())
+        Ok(interactees.search_button.click().await?)
     }
 
     pub async fn select_unit(&self, query: &FinderQuery) -> Result<(), Box<dyn Error>> {
@@ -143,7 +166,7 @@ impl SeatFinder {
             }
             None => Err(
                 Box::new(
-                    OfferingError::NoValidOfferingsFoundError(query.unit_code())
+                    OfferingError::NoValidOfferingsError(query.unit_code())
                 )
             )
         }
@@ -156,8 +179,14 @@ impl SeatFinder {
         Ok(searcher.search().await?)
     }
 
+    pub async fn reset_timetable(&self) -> WebDriverResult<()> {
+        self.clear_timetable().await?;
+        self.reselect_all().await?;
+        Ok(())
+    }
+
     pub async fn quit(mut self) -> WebDriverResult<()> {
-        self.chromedriver.kill().expect("chromedriver could not be killed");
+        self.chromedriver.kill().expect("chromedriver process could not be killed");
         self.driver.quit().await?;
         Ok(())
     }
@@ -165,6 +194,20 @@ impl SeatFinder {
     async fn clear_timetable(&self) -> WebDriverResult<()> {
         let clear_button = self.query_by_xpath(CLEAR_BUTTON).await?;
         Ok(clear_button.click().await?)
+    }
+
+    async fn reselect_all(&self) -> WebDriverResult<()> {
+        let checkbox_id = format_str(
+            ACTIVITY_CHECKBOX_FORMAT.as_str(), 
+            "ALL"
+        );
+        let by = By::Id(checkbox_id);
+        
+        let activity_checkbox = self.driver
+            .query(by)
+            .first()
+            .await?;
+        Ok(activity_checkbox.click().await?)
     }
 
     #[inline]

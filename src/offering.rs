@@ -23,7 +23,7 @@ pub(crate) fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(
     if unit_code != query.unit_code {
         return Err(
             Box::new(
-                OfferingError::NoValidOfferingsFoundError(query.unit_code())
+                OfferingError::NoValidOfferingsError(query.unit_code())
             )
         )
     }
@@ -52,11 +52,14 @@ pub(crate) fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(
 
     let semester = Semester::try_from(semester_match.as_str().to_string())?;
 
-    match semester == query.semester {
+    match semester == query.semester || semester == Semester::Any {
         true => Ok(()),
         false => Err(
             Box::new(
-                SemesterInvalidError { expected: query.semester.clone(), actual: semester } 
+                SemesterInvalidError { 
+                    expected: query.semester.clone(), 
+                    actual: semester 
+                } 
             )
         )
     }
@@ -69,10 +72,10 @@ pub(crate) fn multiple_offerings<'a>(
 ) -> Option<&'a WebElement> {
     let element_position = subcodes
         .iter()
-        .position(|o| single_offering(query, o).is_ok());
+        .position(|subcode| single_offering(query, subcode).is_ok());
 
     match element_position {
-        Some(i) => elements.get(i),
+        Some(index) => elements.get(index),
         None => None
     }
 }

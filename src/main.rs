@@ -9,10 +9,7 @@ use seatfinder::seatfinder::SeatFinder;
 async fn main() -> WebDriverResult<()> {
     let start = Instant::now();
 
-    let seatfinder = match SeatFinder::try_new().await {
-        Ok(seatfinder) => seatfinder,
-        Err(e) => panic!("Error constructing seatfinder: {}", e),
-    };
+    let seatfinder = SeatFinder::new().await;
     seatfinder.seatfind().await;
 
     let elapsed = start.elapsed();

@@ -47,9 +47,10 @@ impl FinderQuery {
             .ok_or(ParseError::ParseJsonError)?
         )?;
 
-        let semester = Semester::try_from(
-            config[SEMESTER].as_u64().ok_or(ParseError::ParseJsonError)?
-        )?;
+        let semester = match config[SEMESTER].as_u64() {
+            Some(semester) => Semester::try_from(semester)?,
+            None => Semester::Any,
+        };
 
         let activity_type = ActivityType::try_from(
             config[ACTIVITIY_TYPE].as_str().ok_or(ParseError::ParseJsonError)?
