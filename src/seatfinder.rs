@@ -9,7 +9,7 @@ use thirtyfour::prelude::*;
 use crate::constants::CONFIG_FILE;
 use crate::error::OfferingError;
 use crate::query::{FinderQuery, FinderConfig};
-use crate::offering::{single_offering, multiple_offerings};
+use crate::methods::{single_offering, multiple_offerings};
 use crate::allocation::AllocationResult;
 use crate::searcher::TimetableSearcher;
 use crate::selector::*;
@@ -43,16 +43,25 @@ impl SeatFinder {
         let json_config: Value = serde_json::from_reader(reader)?;
         let config = FinderConfig::try_new(&json_config)?;
 
-        let chromedriver = Command::new("chromedriver")
+        let mut chromedriver = Command::new("chromedriver")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .arg("-p")
-            .arg(config.port.to_string())
+            .arg(format!("--port={}", config.port))
             .spawn()?;
 
-        let capabilities = DesiredCapabilities::chrome();
+        let mut capabilities = DesiredCapabilities::chrome();
+        if config.headless {
+            capabilities.add_arg("--headless")?;
+        }
+
         let server_url = format!("http://localhost:{}", config.port);
-        let driver = WebDriver::new(server_url, capabilities).await?;
+        let driver = match WebDriver::new(server_url, capabilities).await {
+            Ok(driver) => driver,
+            Err(e) => {
+                chromedriver.kill()?;
+                return Err(Box::new(e)) 
+            }
+        };
         
         Ok(Self { driver, config, chromedriver })
     }
@@ -142,7 +151,7 @@ impl SeatFinder {
             Some(offering) => offering,
             None => return Err(
                 Box::new(
-                    OfferingError::NoOfferingsFoundError(query.unit_code())
+                    OfferingError::NoOfferingsError(query.unit_code())
                 )
             ),
         };

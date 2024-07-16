@@ -12,35 +12,27 @@ pub static GO_BACK_BUTTON: XPathSelector = XPathSelector(r#"//*[@id="activity-de
 
 pub static ACTIVITY_CHECKBOX_FORMAT: IdSelector = IdSelector("ats-{}");
 
-#[derive(Clone, Copy)]
-pub struct XPathSelector(&'static str);
+macro_rules! selector {
+    ($selector_name:ident) => {
+        #[derive(Clone, Copy)]
+        pub struct $selector_name(&'static str);
 
-impl Into<String> for XPathSelector {
-    fn into(self) -> String {
-        self.0.to_owned()
-    }
+        impl Into<String> for $selector_name {
+            fn into(self) -> String {
+                self.0.to_owned()
+            }
+        }
+
+        impl $selector_name {
+            pub fn as_str(&self) -> &str {
+                self.0
+            }
+        }
+    };
 }
 
-impl XPathSelector {
-    pub fn as_str(&self) -> &str {
-        self.0
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct IdSelector(&'static str);
-
-impl Into<String> for IdSelector {
-    fn into(self) -> String {
-        self.0.to_owned()
-    }
-}
-
-impl IdSelector {
-    pub fn as_str(&self) -> &str {
-        self.0
-    }
-}
+selector!(XPathSelector);
+selector!(IdSelector);
 
 pub fn format_u64(src: &str, value: u64) -> String {
     // Workaround for lack of runtime variadic .format method in C#/C/Python/Java etc.

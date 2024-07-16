@@ -3,11 +3,21 @@ use thiserror::Error;
 use crate::allocation::Semester;
 
 #[derive(Error, Debug)]
-pub enum AllocationError {
-    #[error("value for key {:?} not found in allocation table", .0)]
-    TableRowNotFoundError(String),
-    #[error("table must have at least 2 elements per row")]
-    TableSizeError,
+pub enum TableRowError {
+    #[error("error querying or processing an element")]
+    WebElementError,
+    #[error("row key is empty")]
+    MissingKeyError,
+    #[error("table row should have 2 elements but has {} elements instead", .0)]
+    RowSizeError(usize),
+}
+
+#[derive(Error, Debug)]
+pub enum TableError {
+    #[error("expected {} rows in the table but found {}", .0, .1)]
+    TableSizeError(usize, usize),
+    #[error("value for key {:?} not found in allocation table", .0)] 
+    RowMissingError(String),
 }
 
 #[derive(Error, Debug)]
@@ -40,8 +50,8 @@ pub enum OfferingError {
     SemesterFormatError(String, String),
     #[error("expected semester {expected}, found semester {actual}")]
     SemesterInvalidError { expected: Semester, actual: Semester },
-    #[error("no sessions found for {:?}", .0)]
-    NoOfferingsFoundError(String),
+    #[error("no offerings found for {:?}", .0)]
+    NoOfferingsError(String),
     #[error("no valid sessions found for {:?}", .0)]
     NoValidOfferingsError(String),
 }

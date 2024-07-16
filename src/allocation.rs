@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use strum::{Display, IntoStaticStr};
 
 use crate::constants::SEMESTER_KEY_FORMAT;
-use crate::error::{AllocationError, ParseError};
+use crate::error::{ParseError, TableError};
 
 pub type AllocationResult = Result<Option<Allocation>, Box<dyn Error>>;
 
@@ -186,8 +186,8 @@ pub struct Allocation {
     pub seats: u16,
 }
 
-fn allocation_table_get(map: &HashMap<String, String>, key: &str) -> Result<String, AllocationError> {
-    map.get(key).ok_or(AllocationError::TableRowNotFoundError(key.to_string())).cloned()
+fn allocation_table_get(map: &HashMap<String, String>, key: &str) -> Result<String, TableError> {
+    map.get(key).ok_or(TableError::RowMissingError(key.to_owned())).cloned()
 }
 
 impl Allocation {

@@ -8,7 +8,9 @@ lazy_static!{
     pub static ref SEMESTER_KEY_FORMAT: Regex = Regex::new(r"Semester (\d+)").unwrap();
 }
 
-pub const DEFAULT_PORT: u64 = 7777;
+pub const DEFAULT_HEADLESS: bool = false;
+pub const DEFAULT_PORT: u64 = 9515;
+
 pub const MIN_PORT: u64 = 1024;
 pub const MAX_PORT: u64 = 65535;
 

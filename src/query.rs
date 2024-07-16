@@ -2,16 +2,12 @@ use serde_json::{self, Value};
 
 use crate::allocation::{ActivityType, Day, Semester};
 use crate::constants::{
-    DEFAULT_PORT, 
-    MIN_PORT,
-    MAX_PORT, 
-    PUBLIC_TIMETABLE_EVEN, 
-    PUBLIC_TIMETABLE_ODD, 
-    SUBCODE_FORMAT, 
-    UNIT_CODE_FORMAT
+    DEFAULT_HEADLESS, DEFAULT_PORT, MAX_PORT, MIN_PORT, PUBLIC_TIMETABLE_EVEN, PUBLIC_TIMETABLE_ODD, SUBCODE_FORMAT, UNIT_CODE_FORMAT
 };
 use crate::error::ParseError;
+use crate::methods::public_timetable_url_default;
 
+const HEADLESS: &'static str = "headless";
 const PORT: &'static str = "port";
 const PARITY: &'static str = "parity";
 
@@ -56,14 +52,14 @@ impl FinderQuery {
         let activity_type = ActivityType::try_from(
             config[ACTIVITIY_TYPE].as_str().ok_or(ParseError::ParseJsonError)?
         )?;
-        let activity_number = config[ACTIVITY].as_u64().ok_or(ParseError::ParseJsonError)?;
+        let activity = config[ACTIVITY].as_u64().ok_or(ParseError::ParseJsonError)?;
 
         Ok(FinderQuery { 
             unit_code, 
             day, 
             semester, 
             activity_type, 
-            activity: activity_number 
+            activity: activity 
         })
     }
 
@@ -76,20 +72,27 @@ impl FinderQuery {
 pub struct FinderConfig {
     pub port: u64,
     pub public_timetable_url: String,
+    pub headless: bool,
     pub queries: Vec<FinderQuery>,
 }
 
 impl FinderConfig {
     pub fn try_new(config: &Value) -> Result<Self, ParseError> {
+        let headless = match config.get(HEADLESS) {
+            Some(headless) => headless.as_bool().ok_or(ParseError::ParseJsonError)?,
+            None => DEFAULT_HEADLESS,
+        };
+
         let port = config[PORT].as_u64().unwrap_or(DEFAULT_PORT);
         if port < MIN_PORT || port > MAX_PORT {
             return Err(ParseError::ParseJsonError);
         }
 
-        let parity = config[PARITY].as_str().ok_or(ParseError::ParseJsonError)?;
+        let parity = config[PARITY].as_str().unwrap_or("default");
         let public_timetable_url = match parity {
             "odd" => PUBLIC_TIMETABLE_ODD.to_owned(),
             "even" => PUBLIC_TIMETABLE_EVEN.to_owned(),
+            "default" => public_timetable_url_default().to_owned(),
             _ => return Err(ParseError::ParseParityError),
         };
 
@@ -100,6 +103,6 @@ impl FinderConfig {
             .map(FinderQuery::try_new)
             .collect::<Result<_, _>>()?;
 
-        Ok(Self { port, public_timetable_url, queries })
+        Ok(Self { port, public_timetable_url, headless, queries })
     }
 }

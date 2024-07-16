@@ -15,5 +15,6 @@ async fn main() -> WebDriverResult<()> {
     let elapsed = start.elapsed();
     println!("Program took {:.2?} seconds to execute", elapsed);
     seatfinder.quit().await?;
+    
     Ok(())
 }
