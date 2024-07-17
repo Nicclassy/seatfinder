@@ -1,15 +1,19 @@
 use std::fs::File;
 use std::error::Error;
 use std::io::BufReader;
+use std::thread;
+use std::time::{Duration, Instant};
 use std::process::{Child, Command, Stdio};
 
+use futures::future;
+use tokio::runtime::{Builder, Runtime};
 use serde_json::{self, Value};
 use thirtyfour::prelude::*;
 
 use crate::constants::CONFIG_FILE;
 use crate::error::OfferingError;
 use crate::query::{FinderQuery, FinderConfig};
-use crate::methods::{single_offering, multiple_offerings};
+use crate::methods::{multiple_offerings, parse_queries, single_offering};
 use crate::allocation::AllocationResult;
 use crate::searcher::TimetableSearcher;
 use crate::selector::*;
@@ -26,6 +30,7 @@ pub struct SeatFinder {
     driver: WebDriver,
     config: FinderConfig,
     chromedriver: Child,
+    queries: Vec<FinderQuery>,
 }
 
 impl SeatFinder {
@@ -41,7 +46,7 @@ impl SeatFinder {
         let reader = BufReader::new(file);
         
         let json_config: Value = serde_json::from_reader(reader)?;
-        let config = FinderConfig::try_new(&json_config)?;
+        let config = FinderConfig::try_new(json_config)?;
 
         let mut chromedriver = Command::new("chromedriver")
             .stdout(Stdio::null())
@@ -53,8 +58,9 @@ impl SeatFinder {
         if config.headless {
             capabilities.add_arg("--headless")?;
         }
-
+        
         let server_url = format!("http://localhost:{}", config.port);
+        thread::sleep(Duration::from_millis(1));
         let driver = match WebDriver::new(server_url, capabilities).await {
             Ok(driver) => driver,
             Err(e) => {
@@ -63,12 +69,33 @@ impl SeatFinder {
             }
         };
         
-        Ok(Self { driver, config, chromedriver })
+        let queries = if config.parallel {
+            Vec::new()
+        } else {
+            match parse_queries() {
+                Ok(queries) => queries,
+                Err(e) => {
+                    chromedriver.kill()?;
+                    panic!("Error parsing queries: {}", e);
+                }
+            }
+        };
+
+        Ok(Self { driver, config, chromedriver, queries })
     }
 
-    pub async fn seatfind(&self) {    
-        let queries = &self.config.queries;
-        for query in queries.iter() {
+    pub fn add_query(&mut self, query: FinderQuery) -> &mut Self {
+        self.queries.push(query);
+        self
+    }
+
+    pub async fn seatfind(&self) {   
+        if self.queries.is_empty() {
+            println!("No queries to find.");
+            return;
+        } 
+
+        for query in self.queries.iter() {
             let interactees = match self.locate_interactees().await {
                 Ok(interactees) => interactees,
                 Err(e) => panic!("Error searching for units: {}", e),
@@ -100,7 +127,14 @@ impl SeatFinder {
         }
     }
 
-    pub async fn locate_interactees(&self) -> WebDriverResult<Interactees> {
+    pub async fn quit(mut self) {
+        self.driver.quit().await.expect("webdriver did not succesfully quit");
+        self.chromedriver.kill().expect("chromedriver did not succesfully quit");
+    }
+}
+
+impl SeatFinder {
+    async fn locate_interactees(&self) -> WebDriverResult<Interactees> {
         self.driver.goto(&self.config.public_timetable_url).await?;
 
         let search_bar = self.query_by_xpath(SEARCH_BAR).await?;
@@ -114,7 +148,7 @@ impl SeatFinder {
         })
     }
 
-    pub async fn toggle_advanced_filter(&self, query: &FinderQuery) -> WebDriverResult<()> {
+    async fn toggle_advanced_filter(&self, query: &FinderQuery) -> WebDriverResult<()> {
         let checkbox_id = format_str(
             ACTIVITY_CHECKBOX_FORMAT.as_str(), 
             query.activity_type.checkbox_id_suffix()
@@ -128,14 +162,14 @@ impl SeatFinder {
         Ok(activity_checkbox.click().await?)
     }
 
-    pub async fn search_timetable(&self, interactees: &Interactees, query: &FinderQuery) -> WebDriverResult<()> {
+    async fn search_timetable(&self, interactees: &Interactees, query: &FinderQuery) -> WebDriverResult<()> {
         interactees.search_bar.clear().await?;
         interactees.search_bar.send_keys(&query.unit_code).await?;
         interactees.search_button.wait_until().clickable().await?;
         Ok(interactees.search_button.click().await?)
     }
 
-    pub async fn select_unit(&self, query: &FinderQuery) -> Result<(), Box<dyn Error>> {
+    async fn select_unit(&self, query: &FinderQuery) -> Result<(), Box<dyn Error>> {
         let selected_results = self.driver
             .query(By::XPath(UNIT_OFFERINGS))
             .all_from_selector()
@@ -181,22 +215,16 @@ impl SeatFinder {
         }
     }
 
-    pub async fn search_query(&self, interactees: &Interactees, query: &FinderQuery) -> AllocationResult {
+    async fn search_query(&self, interactees: &Interactees, query: &FinderQuery) -> AllocationResult {
         interactees.show_timetable_button.click().await?;
 
         let searcher = TimetableSearcher::new(&self.driver, query);
         Ok(searcher.search().await?)
     }
 
-    pub async fn reset_timetable(&self) -> WebDriverResult<()> {
+    async fn reset_timetable(&self) -> WebDriverResult<()> {
         self.clear_timetable().await?;
         self.reselect_all().await?;
-        Ok(())
-    }
-
-    pub async fn quit(mut self) -> WebDriverResult<()> {
-        self.chromedriver.kill().expect("chromedriver process could not be killed");
-        self.driver.quit().await?;
         Ok(())
     }
 
@@ -223,4 +251,46 @@ impl SeatFinder {
     async fn query_by_xpath(&self, xpath: impl Into<String>) -> WebDriverResult<WebElement> {
         self.driver.query(By::XPath(xpath)).first().await
     }
+}
+
+pub fn run_parallel() {
+    let queries = parse_queries().unwrap();
+
+    let rt = Builder::new_multi_thread()
+        .worker_threads(queries.len())
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let seatfinders = queries.into_iter().map(|query| async move {
+        let mut seatfinder = SeatFinder::new().await;
+        println!("query is {:?}", query);
+        seatfinder.add_query(query);
+        seatfinder
+    });
+
+    rt.block_on(async move {
+        let seatfinders = future::join_all(seatfinders).await;
+        let handles = seatfinders.into_iter().map(|seatfinder| async move {
+            seatfinder.seatfind().await;
+            seatfinder.quit().await
+        });
+
+        future::join_all(handles).await;
+    })
+}
+
+pub fn run() {
+    let rt = Runtime::new().unwrap();
+    let start = Instant::now();
+    
+    rt.block_on(async move {
+        let seatfinder = SeatFinder::new().await;
+        seatfinder.seatfind().await;
+        seatfinder.quit().await;
+    });
+    
+    let elapsed = start.elapsed();
+
+    println!("Program took {:.2?} seconds to execute", elapsed);
 }

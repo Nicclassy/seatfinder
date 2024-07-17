@@ -191,7 +191,7 @@ fn allocation_table_get(map: &HashMap<String, String>, key: &str) -> Result<Stri
 }
 
 impl Allocation {
-    pub async fn try_new(table: &HashMap<String, String>) -> Result<Allocation, Box<dyn Error>> {
+    pub fn try_new(table: &HashMap<String, String>) -> Result<Allocation, Box<dyn Error>> {
         let activity_type = ActivityType::try_from(
             allocation_table_get(&table, "Activity Type")?.as_str()
         )?;

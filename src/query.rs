@@ -2,11 +2,20 @@ use serde_json::{self, Value};
 
 use crate::allocation::{ActivityType, Day, Semester};
 use crate::constants::{
-    DEFAULT_HEADLESS, DEFAULT_PORT, MAX_PORT, MIN_PORT, PUBLIC_TIMETABLE_EVEN, PUBLIC_TIMETABLE_ODD, SUBCODE_FORMAT, UNIT_CODE_FORMAT
+    DEFAULT_HEADLESS, 
+    DEFAULT_PARALLEL, 
+    DEFAULT_PORT, 
+    MIN_PORT, 
+    MAX_PORT, 
+    PUBLIC_TIMETABLE_EVEN, 
+    PUBLIC_TIMETABLE_ODD, 
+    SUBCODE_FORMAT, 
+    UNIT_CODE_FORMAT
 };
 use crate::error::ParseError;
-use crate::methods::public_timetable_url_default;
+use crate::methods::{port_is_occupied, public_timetable_url_default, unoccupied_port};
 
+const PARALLEL: &'static str = "parallel";
 const HEADLESS: &'static str = "headless";
 const PORT: &'static str = "port";
 const PARITY: &'static str = "parity";
@@ -16,7 +25,6 @@ const SEMESTER: &'static str = "semester";
 const DAY: &'static str = "day";
 const ACTIVITIY_TYPE: &'static str = "activity_type";
 const ACTIVITY: &'static str = "activity";
-const QUERIES: &'static str = "queries";
 
 #[derive(Debug)]
 pub struct FinderQuery {
@@ -59,7 +67,7 @@ impl FinderQuery {
             day, 
             semester, 
             activity_type, 
-            activity: activity 
+            activity 
         })
     }
 
@@ -70,25 +78,42 @@ impl FinderQuery {
 
 #[derive(Debug)]
 pub struct FinderConfig {
-    pub port: u64,
+    pub port: u16,
     pub public_timetable_url: String,
     pub headless: bool,
-    pub queries: Vec<FinderQuery>,
+    pub parallel: bool,
 }
 
 impl FinderConfig {
-    pub fn try_new(config: &Value) -> Result<Self, ParseError> {
-        let headless = match config.get(HEADLESS) {
-            Some(headless) => headless.as_bool().ok_or(ParseError::ParseJsonError)?,
+    pub fn try_new(json_config: Value) -> Result<Self, ParseError> {
+        let parallel = match json_config.get(PARALLEL) {
+            Some(value) => value.as_bool().ok_or(ParseError::ParseJsonError)?,
+            None => DEFAULT_PARALLEL,
+        };
+        let headless = match json_config.get(HEADLESS) {
+            Some(value) => value.as_bool().ok_or(ParseError::ParseJsonError)?,
             None => DEFAULT_HEADLESS,
         };
 
-        let port = config[PORT].as_u64().unwrap_or(DEFAULT_PORT);
-        if port < MIN_PORT || port > MAX_PORT {
+        let given_port = match json_config[PORT].as_u64() {
+            Some(given_port) if !parallel => given_port as u16,
+            Some(_) => panic!("port cannot be specified if the program is run in parallel"),
+            None => DEFAULT_PORT,
+        };
+
+        if given_port < MIN_PORT || given_port > MAX_PORT {
             return Err(ParseError::ParseJsonError);
         }
 
-        let parity = config[PARITY].as_str().unwrap_or("default");
+        let port = if !parallel && !port_is_occupied(given_port) {
+            given_port
+        } else if !parallel {
+            DEFAULT_PORT
+        } else {
+            unoccupied_port(DEFAULT_PORT)
+        };
+
+        let parity = json_config[PARITY].as_str().unwrap_or("default");
         let public_timetable_url = match parity {
             "odd" => PUBLIC_TIMETABLE_ODD.to_owned(),
             "even" => PUBLIC_TIMETABLE_EVEN.to_owned(),
@@ -96,13 +121,6 @@ impl FinderConfig {
             _ => return Err(ParseError::ParseParityError),
         };
 
-        let queries: Vec<FinderQuery> = config[QUERIES]
-            .as_array()
-            .ok_or(ParseError::ParseQueriesError)?
-            .into_iter()
-            .map(FinderQuery::try_new)
-            .collect::<Result<_, _>>()?;
-
-        Ok(Self { port, public_timetable_url, headless, queries })
+        Ok(Self { port, public_timetable_url, headless, parallel })
     }
 }

@@ -8,11 +8,13 @@ lazy_static!{
     pub static ref SEMESTER_KEY_FORMAT: Regex = Regex::new(r"Semester (\d+)").unwrap();
 }
 
+pub const DEFAULT_PARALLEL: bool = false;
 pub const DEFAULT_HEADLESS: bool = false;
-pub const DEFAULT_PORT: u64 = 9515;
 
-pub const MIN_PORT: u64 = 1024;
-pub const MAX_PORT: u64 = 65535;
+pub const LOCALHOST: &'static str = "127.0.0.1";
+pub const DEFAULT_PORT: u16 = 9515;
+pub const MIN_PORT: u16 = 1024;
+pub const MAX_PORT: u16 = 65535;
 
 pub const CONFIG_FILE: &'static str = "config.json";
 pub const ROWS_IN_TABLE: usize = 12;

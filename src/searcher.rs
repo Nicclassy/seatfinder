@@ -41,8 +41,8 @@ impl<'a> TimetableSearcher<'a> {
     async fn allocation_from_table(&self, timetable_column: &str, timetable_row: u64) -> Result<Allocation, Box<dyn Error>> {
         let mut allocation_table = HashMap::with_capacity(ROWS_IN_TABLE);
         let mut table_rows = self.table_rows().await?; 
-        
         let mut table_row_number = 0;
+        
         while table_row_number < ROWS_IN_TABLE {
             let table_row = &table_rows[table_row_number];
             let row_query = table_row
@@ -97,7 +97,7 @@ impl<'a> TimetableSearcher<'a> {
             );
         }
 
-        let allocation = Allocation::try_new(&allocation_table).await?;
+        let allocation = Allocation::try_new(&allocation_table)?;
         Ok(allocation)
     }
 
