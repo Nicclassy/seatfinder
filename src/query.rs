@@ -3,8 +3,8 @@ use serde_json::{self, Value};
 use crate::allocation::{ActivityType, Day, Semester};
 use crate::constants::{
     DEFAULT_HEADLESS, 
-    DEFAULT_PARALLEL, 
     DEFAULT_PORT, 
+    DEFAULT_RUN_CHROMEDRIVER, 
     MIN_PORT, 
     MAX_PORT, 
     PUBLIC_TIMETABLE_EVEN, 
@@ -15,10 +15,10 @@ use crate::constants::{
 use crate::error::ParseError;
 use crate::methods::{port_is_occupied, public_timetable_url_default, unoccupied_port};
 
-const PARALLEL: &'static str = "parallel";
 const HEADLESS: &'static str = "headless";
 const PORT: &'static str = "port";
 const PARITY: &'static str = "parity";
+const RUN_CHROMEDRIVER: &'static str = "run_chromedriver";
 
 const UNIT_CODE: &'static str = "unit_code";
 const SEMESTER: &'static str = "semester";
@@ -81,37 +81,33 @@ pub struct FinderConfig {
     pub port: u16,
     pub public_timetable_url: String,
     pub headless: bool,
-    pub parallel: bool,
+    pub run_chromedriver: bool,
 }
 
 impl FinderConfig {
     pub fn try_new(json_config: Value) -> Result<Self, ParseError> {
-        let parallel = match json_config.get(PARALLEL) {
-            Some(value) => value.as_bool().ok_or(ParseError::ParseJsonError)?,
-            None => DEFAULT_PARALLEL,
-        };
         let headless = match json_config.get(HEADLESS) {
             Some(value) => value.as_bool().ok_or(ParseError::ParseJsonError)?,
             None => DEFAULT_HEADLESS,
         };
 
-        let given_port = match json_config[PORT].as_u64() {
-            Some(given_port) if !parallel => given_port as u16,
-            Some(_) => panic!("port cannot be specified if the program is run in parallel"),
+        let run_chromedriver = match json_config.get(RUN_CHROMEDRIVER) {
+            Some(value) => value.as_bool().ok_or(ParseError::ParseJsonError)?,
+            None => DEFAULT_RUN_CHROMEDRIVER,
+        };
+
+        let mut port = match json_config[PORT].as_u64() {
+            Some(port) => port as u16,
             None => DEFAULT_PORT,
         };
 
-        if given_port < MIN_PORT || given_port > MAX_PORT {
+        if port < MIN_PORT || port > MAX_PORT {
             return Err(ParseError::ParseJsonError);
         }
 
-        let port = if !parallel && !port_is_occupied(given_port) {
-            given_port
-        } else if !parallel {
-            DEFAULT_PORT
-        } else {
-            unoccupied_port(DEFAULT_PORT)
-        };
+        if run_chromedriver && port_is_occupied(port) {
+            port = unoccupied_port(DEFAULT_PORT);
+        }
 
         let parity = json_config[PARITY].as_str().unwrap_or("default");
         let public_timetable_url = match parity {
@@ -121,6 +117,6 @@ impl FinderConfig {
             _ => return Err(ParseError::ParseParityError),
         };
 
-        Ok(Self { port, public_timetable_url, headless, parallel })
+        Ok(Self { port, public_timetable_url, headless, run_chromedriver })
     }
 }

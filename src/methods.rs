@@ -1,9 +1,8 @@
 use std::error::Error;
 use std::fs::File;
-use std::sync::{Arc, Mutex};
+use std::process::{Child, Command, Stdio};
 use std::net::TcpListener;
 
-use once_cell::sync::Lazy;
 use serde_json::{self, Value};
 use chrono::Datelike;
 use thirtyfour::WebElement;
@@ -21,13 +20,38 @@ use crate::allocation::Semester;
 use crate::query::FinderQuery;
 use crate::error::{ParseError, OfferingError};
 
-static USED_PORTS: Lazy<Arc<Mutex<Vec<u16>>>> = Lazy::new(|| Arc::new(Mutex::new(Vec::new())));
-
+const QUERY: &'static str = "query";
 const QUERIES: &'static str = "queries";
+
+pub fn format_u64(src: &str, value: u64) -> String {
+    // Workaround for lack of runtime variadic .format method in C#/C/Python/Java etc.
+    // Not the cleanest solution but obeys the orphan rule
+    src.replacen("{}", &value.to_string(), 1)
+}
+
+pub fn format_str(src: &str, value: &str) -> String {
+    src.replacen("{}", value, 1)
+}
+
+pub fn chromedriver_process(port: u16) -> Result<Child, std::io::Error> {
+    Command::new("chromedriver")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .arg(format!("--port={}", port))
+        .spawn()
+}
 
 pub fn parse_queries() -> Result<Vec<FinderQuery>, Box<dyn Error>> {
     let file = File::open(CONFIG_FILE)?;
     let json_config: Value = serde_json::from_reader(file)?;
+
+    match json_config[QUERY].as_object() {
+        Some(_) => {
+            let query = FinderQuery::try_new(&json_config[QUERY])?;
+            return Ok(vec![query]);
+        }
+        None => {},
+    };
 
     let queries: Vec<FinderQuery> = json_config[QUERIES]
         .as_array()
@@ -45,32 +69,19 @@ pub fn public_timetable_url_default() -> &'static str {
 }
 
 pub fn port_is_occupied(port: u16) -> bool {
-    TcpListener::bind((LOCALHOST, port)).is_ok()
+   TcpListener::bind((LOCALHOST, port)).is_err()
 }
 
 pub fn unoccupied_port(start: u16) -> u16 {
     let mut port = start;
-    let used_ports_cloned = Arc::clone(&USED_PORTS);
 
     loop {
         if port == MAX_PORT {
-            panic!("could not find available port")
+            panic!("could not find an available port")
         }
-
-        let used_ports = used_ports_cloned.lock().unwrap();
-        if used_ports.contains(&port) {
-            port += 1;
-            continue;
-        }
-
-        drop(used_ports);
 
         match TcpListener::bind((LOCALHOST, port)) {
-            Ok(_) => {
-                let mut used_ports = used_ports_cloned.lock().unwrap();
-                used_ports.push(port);
-                return port;
-            },
+            Ok(_) => return port,
             Err(_) => port += 1,
         }
     }

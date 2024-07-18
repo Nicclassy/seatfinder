@@ -1,5 +1,10 @@
+use tokio;
+use thirtyfour::error::WebDriverResult;
+
 use seatfinder::seatfinder;
 
-fn main() {
-    seatfinder::run_parallel();
+#[tokio::main]
+async fn main() -> WebDriverResult<()> {
+    seatfinder::run().await?;
+    Ok(())
 }

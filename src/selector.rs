@@ -33,13 +33,3 @@ macro_rules! selector {
 
 selector!(XPathSelector);
 selector!(IdSelector);
-
-pub fn format_u64(src: &str, value: u64) -> String {
-    // Workaround for lack of runtime variadic .format method in C#/C/Python/Java etc.
-    // Not the cleanest solution but obeys the orphan rule
-    src.replacen("{}", &value.to_string(), 1)
-}
-
-pub fn format_str(src: &str, value: &str) -> String {
-    src.replacen("{}", value, 1)
-}
