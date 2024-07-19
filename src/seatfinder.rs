@@ -4,7 +4,6 @@ use std::io::BufReader;
 use std::time::Instant;
 use std::process::Child;
 
-use function_timer::time;
 use serde_json::{self, Value};
 use thirtyfour::prelude::*;
 
@@ -138,7 +137,6 @@ impl SeatFinder {
     }
 }
 
-#[time("seatfinder performance testing")]
 impl SeatFinder {
     async fn locate_interactees(&self) -> WebDriverResult<Interactees> {
         self.driver.goto(&self.config.public_timetable_url).await?;

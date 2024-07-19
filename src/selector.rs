@@ -12,24 +12,5 @@ pub static GO_BACK_BUTTON: XPathSelector = XPathSelector(r#"//*[@id="activity-de
 
 pub static ACTIVITY_CHECKBOX_FORMAT: IdSelector = IdSelector("ats-{}");
 
-macro_rules! selector {
-    ($selector_name:ident) => {
-        #[derive(Clone, Copy)]
-        pub struct $selector_name(&'static str);
-
-        impl Into<String> for $selector_name {
-            fn into(self) -> String {
-                self.0.to_owned()
-            }
-        }
-
-        impl $selector_name {
-            pub fn as_str(&self) -> &str {
-                self.0
-            }
-        }
-    };
-}
-
 selector!(XPathSelector);
 selector!(IdSelector);
