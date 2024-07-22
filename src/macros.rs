@@ -10,6 +10,12 @@ macro_rules! selector {
             }
         }
 
+        impl ::std::fmt::Display for $selector_name {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+
         impl $selector_name {
             pub fn as_str(&self) -> &str {
                 self.0

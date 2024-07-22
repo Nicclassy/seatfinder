@@ -13,8 +13,8 @@ use crate::constants::{
     MAX_PORT, 
     PUBLIC_TIMETABLE_EVEN, 
     PUBLIC_TIMETABLE_ODD, 
-    SEMESTER_FORMAT, 
-    SUBCODE_FORMAT
+    SEMESTER_RE, 
+    SUBCODE_RE
 };
 use crate::allocation::Semester;
 use crate::query::FinderQuery;
@@ -89,11 +89,11 @@ pub fn unoccupied_port(start: u16) -> u16 {
 
 pub fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<dyn Error>> {
     let Some((_, [unit_code, session])) = 
-        SUBCODE_FORMAT.captures(&subcode).map(|caps| caps.extract()) else {
+        SUBCODE_RE.captures(&subcode).map(|caps| caps.extract()) else {
             return Err(
                 Box::new(
                     ParseError::RegexNoMatchError(
-                        SUBCODE_FORMAT.as_str(), 
+                        SUBCODE_RE.as_str(), 
                         subcode.to_string()
                     )
                 )
@@ -108,7 +108,7 @@ pub fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<
         )
     }
 
-    let semester_match = match SEMESTER_FORMAT.captures(session) {
+    let semester_match = match SEMESTER_RE.captures(session) {
         Some(caps) => match caps.get(1) {
             Some(semester_match) => semester_match,
             None => return Err(
@@ -123,7 +123,7 @@ pub fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<
         None => return Err(
             Box::new(
                 ParseError::RegexNoMatchError(
-                    SEMESTER_FORMAT.as_str(), 
+                    SEMESTER_RE.as_str(), 
                     session.to_string()
                 )
             )

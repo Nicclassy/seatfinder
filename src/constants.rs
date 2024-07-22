@@ -2,10 +2,11 @@ use regex::Regex;
 use lazy_static::lazy_static;
 
 lazy_static!{
-    pub static ref UNIT_CODE_FORMAT: Regex = Regex::new(r"([a-zA-Z]{4}\d{4})").unwrap();
-    pub static ref SUBCODE_FORMAT: Regex = Regex::new(r"([a-zA-Z]{4}\d{4})-(\w+).+").unwrap();
-    pub static ref SEMESTER_FORMAT: Regex = Regex::new(r"S([12]).+").unwrap();
-    pub static ref SEMESTER_KEY_FORMAT: Regex = Regex::new(r"Semester (\d+)").unwrap();
+    pub static ref TWELVE_HOUR_TIME_RE: Regex = Regex::new(r"^([0-9]|1[012])(:[0-5]\d)?(am|pm|AM|PM)$").unwrap();
+    pub static ref UNIT_CODE_RE: Regex = Regex::new(r"^([a-zA-Z]{4}\d{4})$").unwrap();
+    pub static ref SUBCODE_RE: Regex = Regex::new(r"^([a-zA-Z]{4}\d{4})-(\w+).+$").unwrap();
+    pub static ref SEMESTER_RE: Regex = Regex::new(r"^S([12]).+$").unwrap();
+    pub static ref SEMESTER_KEY_RE: Regex = Regex::new(r"^Semester (\d+)$").unwrap();
 }
 
 pub const TIMED: bool = true;

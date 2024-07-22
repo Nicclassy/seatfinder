@@ -17,9 +17,9 @@ use crate::methods::{
     single_offering,
     multiple_offerings, 
 };
+use crate::selector::*;
 use crate::allocation::AllocationResult;
 use crate::searcher::TimetableSearcher;
-use crate::selector::*;
 
 #[derive(Debug)]
 pub struct Interactees {
@@ -116,7 +116,7 @@ impl SeatFinder {
             }
         
             match self.search_query(&interactees, query).await {
-                Ok(o) => match o {
+                Ok(opt) => match opt {
                     Some(allocation) => allocation.notify_query_resolved(query.unit_code()),
                     None => println!("No allocations found for {} matching the given query.", query.unit_code()),
                 }
@@ -153,6 +153,13 @@ impl SeatFinder {
     }
 
     async fn toggle_advanced_filter(&self, query: &FinderQuery) -> WebDriverResult<()> {
+        if let Some(ref start_time) = query.start_after {
+            // For some reason, the start time must be entered as one hour ahead of the actual start time
+            // so as to exclude prior allocations
+            let script = format!("document.getElementById('{}').value = '{}';", START_TIME, start_time.progress_one_hour());
+            self.driver.execute(script, Vec::new()).await?;
+        }
+
         let checkbox_id = format_str(
             ACTIVITY_CHECKBOX_FORMAT.as_str(), 
             query.activity_type.checkbox_id_suffix()
@@ -163,7 +170,9 @@ impl SeatFinder {
             .query(by)
             .first()
             .await?;
-        Ok(activity_checkbox.click().await?)
+        
+        activity_checkbox.click().await?;
+        Ok(())
     }
 
     async fn search_timetable(&self, interactees: &Interactees, query: &FinderQuery) -> WebDriverResult<()> {
@@ -194,6 +203,8 @@ impl SeatFinder {
             ),
         };
 
+        // For some strange reason, the checkbox (for the offering) does not need to be clicked
+        // to show allocations when the starting after value is modified
         if subcodes.len() == 1 {
             return match single_offering(query, first_offering) {
                 Ok(()) => {

@@ -1,9 +1,10 @@
 use std::error::Error;
 use std::collections::HashMap;
+use std::fmt;
 
 use strum::{Display, IntoStaticStr};
 
-use crate::constants::SEMESTER_KEY_FORMAT;
+use crate::constants::{SEMESTER_KEY_RE, TWELVE_HOUR_TIME_RE};
 use crate::error::{ParseError, TableError};
 
 pub type AllocationResult = Result<Option<Allocation>, Box<dyn Error>>;
@@ -14,13 +15,52 @@ pub struct TwentyFourHourTime {
     pub minutes: u8,
 }
 
+impl fmt::Display for TwentyFourHourTime {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:0>2}:{:0>2}", self.hours, self.minutes)
+    }
+}
+
 impl TwentyFourHourTime {
-    pub fn new(value: String) -> Option<Self> {
+    pub fn new(value: &str) -> Option<Self> {
+        Self::from_twenty_four_hr(value).or_else(|| Self::from_twelve_hour(value))
+    }
+
+    pub fn from_twenty_four_hr(value: &str) -> Option<Self> {
         let (hrs, mins) = value.split_once(':')?;
         let hours = hrs.parse::<u8>().ok()?;
         let minutes = mins.parse::<u8>().ok()?;
 
-        Some(Self { hours, minutes })
+        if hours > 23 || minutes > 59 {
+            None
+        } else {
+            Some(Self { hours, minutes })
+        }
+    }
+
+    pub fn from_twelve_hour(value: &str) -> Option<Self> {
+        let (mut hours, minutes, period) = match TWELVE_HOUR_TIME_RE.captures(value) {
+            Some(caps) => {
+                let hours = caps[1].parse::<u8>().ok()?;
+                let minutes = match caps.get(2) {
+                    Some(value) => (value.as_str()[1..]).parse::<u8>().ok()?,
+                    None => 0,
+                };
+                let period = caps[3].to_string();
+                (hours, minutes, period)
+            }
+            None => return None,
+        };
+
+        if period.to_ascii_lowercase() == "pm" {
+            hours += 12;
+        }
+
+        Some(TwentyFourHourTime { hours, minutes })
+    }
+
+    pub fn progress_one_hour(&self) -> Self {
+        Self { hours: self.hours + 1, minutes: self.minutes }
     }
 }
 
@@ -53,7 +93,7 @@ impl TryFrom<String> for Semester {
             Err(_) => {{}},
         }
         
-        let Some(caps) = SEMESTER_KEY_FORMAT.captures(&value) else {
+        let Some(caps) = SEMESTER_KEY_RE.captures(&value) else {
             return Err(ParseError::ParseSemesterStrError(value));
         };
 
@@ -203,8 +243,8 @@ impl Allocation {
         let day = Day::try_from(
             allocation_table_get(&table, "Day")?.as_str()
         )?;
-        let time_string = allocation_table_get(&table, "Time")?.to_string();
-        let time = TwentyFourHourTime::new(time_string.clone())
+        let time_string = allocation_table_get(&table, "Time")?;
+        let time = TwentyFourHourTime::new(&time_string)
             .ok_or(ParseError::ParseTimeError(time_string))?;
 
         let semester = Semester::try_from(

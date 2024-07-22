@@ -11,6 +11,7 @@ pub static ALLOCATION_TABLE_ROWS: XPathSelector = XPathSelector(r#"//*[@id="acti
 pub static GO_BACK_BUTTON: XPathSelector = XPathSelector(r#"//*[@id="activity-details-tpl"]/div[2]/div[6]/button[1]"#);
 
 pub static ACTIVITY_CHECKBOX_FORMAT: IdSelector = IdSelector("ats-{}");
+pub static START_TIME: IdSelector = IdSelector("start-time-filter");
 
 selector!(XPathSelector);
 selector!(IdSelector);

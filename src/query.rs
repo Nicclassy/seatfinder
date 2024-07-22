@@ -1,6 +1,6 @@
 use serde_json::{self, Value};
 
-use crate::allocation::{ActivityType, Day, Semester};
+use crate::allocation::{ActivityType, Day, Semester, TwentyFourHourTime};
 use crate::constants::{
     DEFAULT_HEADLESS, 
     DEFAULT_PORT, 
@@ -9,11 +9,15 @@ use crate::constants::{
     MAX_PORT, 
     PUBLIC_TIMETABLE_EVEN, 
     PUBLIC_TIMETABLE_ODD, 
-    SUBCODE_FORMAT, 
-    UNIT_CODE_FORMAT
+    SUBCODE_RE, 
+    UNIT_CODE_RE
 };
 use crate::error::ParseError;
-use crate::methods::{port_is_occupied, public_timetable_url_default, unoccupied_port};
+use crate::methods::{
+    port_is_occupied, 
+    public_timetable_url_default, 
+    unoccupied_port
+};
 
 const HEADLESS: &'static str = "headless";
 const PORT: &'static str = "port";
@@ -23,6 +27,7 @@ const RUN_CHROMEDRIVER: &'static str = "run_chromedriver";
 const UNIT_CODE: &'static str = "unit_code";
 const SEMESTER: &'static str = "semester";
 const DAY: &'static str = "day";
+const START_AFTER: &'static str = "start_after";
 const ACTIVITIY_TYPE: &'static str = "activity_type";
 const ACTIVITY: &'static str = "activity";
 
@@ -33,6 +38,7 @@ pub struct FinderQuery {
     pub day: Day,
     pub activity_type: ActivityType,
     pub activity: u64,
+    pub start_after: Option<TwentyFourHourTime>,
 }
 
 impl FinderQuery {
@@ -41,8 +47,8 @@ impl FinderQuery {
             .as_str()
             .ok_or(ParseError::ParseJsonError)?
             .to_string();
-        if !UNIT_CODE_FORMAT.is_match(unit_code.as_str()) {
-            return Err(ParseError::RegexNoMatchError(SUBCODE_FORMAT.as_str(), unit_code));
+        if !UNIT_CODE_RE.is_match(unit_code.as_str()) {
+            return Err(ParseError::RegexNoMatchError(SUBCODE_RE.as_str(), unit_code));
         }
         let day = match config[DAY].as_u64() {
             Some(value) => Day::try_from(value)?,
@@ -62,12 +68,19 @@ impl FinderQuery {
         )?;
         let activity = config[ACTIVITY].as_u64().ok_or(ParseError::ParseJsonError)?;
 
+
+        let start_after = match config[START_AFTER].as_str() {
+            Some(value) => TwentyFourHourTime::new(value),
+            None => None,
+        };
+
         Ok(FinderQuery { 
             unit_code, 
             day, 
             semester, 
             activity_type, 
-            activity 
+            activity,
+            start_after
         })
     }
 
