@@ -6,6 +6,7 @@ use std::process::Child;
 
 use serde_json::{self, Value};
 use thirtyfour::prelude::*;
+use tokio::runtime::Runtime;
 
 use crate::constants::{CONFIG_FILE, TIMED};
 use crate::error::OfferingError;
@@ -268,15 +269,16 @@ impl SeatFinder {
     }
 }
 
-pub async fn run() -> WebDriverResult<()> {
+pub fn run() {
+    let rt = Runtime::new().unwrap();
     let start = if TIMED { Some(Instant::now()) } else { None };
     
-    let seatfinder = SeatFinder::new().await;
-    seatfinder.seatfind().await;
-    seatfinder.quit().await;
-    
+    rt.block_on(async {
+        let seatfinder = SeatFinder::new().await;
+        seatfinder.seatfind().await;
+        seatfinder.quit().await;
+    });
     if let Some(instant) = start {
         println!("Program took {:.2?} seconds to execute", instant.elapsed());
     }
-    Ok(())
 }

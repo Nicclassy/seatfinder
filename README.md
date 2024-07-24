@@ -1,5 +1,6 @@
 # seatfinder
-Finds allocations matching given queries from a JSON file. The JSON file must be named `config.json` as of now. No CLI/GUI exists yet.
+
+Finds allocations that match queries from a JSON file. The JSON file must be named `config.json` as of now. No CLI/GUI exists yet.
 
 An example `config.json` is shown below:
 
@@ -29,6 +30,7 @@ An example `config.json` is shown below:
 
 
 ## Optional `config.json` attributes
+
 `run_chromedriver` (default `false`): Specifies whether or not the program runs a chromedriver instance. You are expected to run an instance of chromedriver if this is set to `false`.
 
 `headless` (default `false`): Run `chromedriver` in headless mode. Does not do anything if the chromedriver instance is run separately.
@@ -38,9 +40,11 @@ An example `config.json` is shown below:
 `parity`: Determines which of the two public timetables to use (`even` or `odd`). The default value depends on the current year—if the current year is an odd number, the parity is `odd` and if the current year is an even number, the parity is `even`.
 
 ## Required `config.json` attributes
+
 `query` or `queries`: `query` expects a single query whereas `queries` expects an array of queries. If both are specified, the value of `query` takes precedence.
 
 ## Query format
+
 `unit_code`: The code of the unit to search for.
 
 `day`: The day the allocation runs on. Can be an ISO week date (i.e. `1-7`) or the weekday's (abbreviated) name.
