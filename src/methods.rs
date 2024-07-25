@@ -5,7 +5,6 @@ use std::net::TcpListener;
 
 use serde_json::{self, Value};
 use chrono::Datelike;
-use thirtyfour::WebElement;
 
 use crate::constants::{
     CONFIG_FILE, 
@@ -26,6 +25,10 @@ const QUERIES: &'static str = "queries";
 pub fn format_u64(src: &str, value: u64) -> String {
     // Workaround for lack of runtime variadic .format method in C#/C/Python/Java etc.
     // Not the cleanest solution but obeys the orphan rule
+    src.replacen("{}", &value.to_string(), 1)
+}
+
+pub fn format_usize(src: &str, value: usize) -> String {
     src.replacen("{}", &value.to_string(), 1)
 }
 
@@ -145,17 +148,11 @@ pub fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<
     }
 }
 
-pub fn multiple_offerings<'a>(
+pub fn multiple_offerings(
     query: &FinderQuery, 
-    subcodes: &'a Vec<String>, 
-    elements: &'a Vec<WebElement>
-) -> Option<&'a WebElement> {
-    let element_position = subcodes
+    subcodes: &Vec<String>, 
+) -> Option<usize> {
+    subcodes
         .iter()
-        .position(|subcode| single_offering(query, subcode).is_ok());
-
-    match element_position {
-        Some(index) => elements.get(index),
-        None => None
-    }
+        .position(|subcode| single_offering(query, subcode).is_ok())
 }

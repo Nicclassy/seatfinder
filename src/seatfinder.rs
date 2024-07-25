@@ -13,6 +13,7 @@ use crate::error::OfferingError;
 use crate::query::{FinderQuery, FinderConfig};
 use crate::methods::{
     format_str, 
+    format_usize,
     chromedriver_process, 
     parse_queries,
     single_offering,
@@ -210,17 +211,19 @@ impl SeatFinder {
             return match single_offering(query, first_offering) {
                 Ok(()) => {
                     let parent = selected_results[0].parent().await?;
-                    let checkbox = parent.query(By::XPath(OFFERING_CHECKBOX)).first().await?;
+                    let by = By::XPath(format_usize(OFFERING_CHECKBOX_FORMAT.as_str(), 1));
+                    let checkbox = parent.query(by).first().await?;
                     Ok(checkbox.click().await?)
                 },
                 Err(e) => Err(e),
             }
         }
         
-        match multiple_offerings(query, &subcodes, &selected_results) {
-            Some(event) => {
-                let parent = event.parent().await?;
-                let checkbox = parent.query(By::XPath(OFFERING_CHECKBOX)).first().await?;
+        match multiple_offerings(query, &subcodes) {
+            Some(index) => {
+                let parent = selected_results[0].parent().await?;
+                let by = By::XPath(format_usize(OFFERING_CHECKBOX_FORMAT.as_str(), index + 1));
+                let checkbox = parent.query(by).first().await?;
                 Ok(checkbox.click().await?)
             }
             None => Err(

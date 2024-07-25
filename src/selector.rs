@@ -4,7 +4,7 @@ pub static SHOW_TIMETABLE: XPathSelector = XPathSelector(r#"//*[@id="toggle-righ
 pub static CLEAR_BUTTON: XPathSelector = XPathSelector(r#"//*[@id="clear-selected-btn"]"#);
 
 pub static UNIT_OFFERINGS: XPathSelector = XPathSelector(r#"//*[@id="selected-results"]/li/strong"#);
-pub static OFFERING_CHECKBOX: XPathSelector = XPathSelector(r#"//*[@id="selected-results"]/li/input"#);
+pub static OFFERING_CHECKBOX_FORMAT: XPathSelector = XPathSelector(r#"//*[@id="selected-results"]/li[{}]/input"#);
 
 pub static ALLOCATION_FORMAT: XPathSelector = XPathSelector(r#"//*[@id="timetable-grid"]/div[4]/div[{}]/div[{}]"#);
 pub static ALLOCATION_TABLE_ROWS: XPathSelector = XPathSelector(r#"//*[@id="activity-details-tpl"]/div[2]/div[4]/table/tbody/*"#);
