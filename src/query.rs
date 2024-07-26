@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde_json::{self, Value};
 
 use crate::allocation::{ActivityType, Day, Semester, TwentyFourHourTime};
@@ -23,6 +25,7 @@ const HEADLESS: &'static str = "headless";
 const PORT: &'static str = "port";
 const PARITY: &'static str = "parity";
 const RUN_CHROMEDRIVER: &'static str = "run_chromedriver";
+const MUSIC: &'static str = "music";
 
 const UNIT_CODE: &'static str = "unit_code";
 const SEMESTER: &'static str = "semester";
@@ -95,6 +98,7 @@ pub struct FinderConfig {
     pub public_timetable_url: String,
     pub headless: bool,
     pub run_chromedriver: bool,
+    pub music: Option<PathBuf>,
 }
 
 impl FinderConfig {
@@ -108,6 +112,11 @@ impl FinderConfig {
             Some(value) => value.as_bool().ok_or(ParseError::ParseJsonError)?,
             None => DEFAULT_RUN_CHROMEDRIVER,
         };
+
+        let music = json_config
+            .get(MUSIC)
+            .and_then(|value| value.as_str())
+            .map(PathBuf::from);
 
         let mut port = match json_config[PORT].as_u64() {
             Some(port) => port as u16,
@@ -130,6 +139,6 @@ impl FinderConfig {
             _ => return Err(ParseError::ParseParityError),
         };
 
-        Ok(Self { port, public_timetable_url, headless, run_chromedriver })
+        Ok(Self { port, public_timetable_url, headless, run_chromedriver, music })
     }
 }

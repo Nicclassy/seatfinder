@@ -6,7 +6,7 @@ use std::process::Child;
 
 use serde_json::{self, Value};
 use thirtyfour::prelude::*;
-use tokio::runtime::Runtime;
+use tokio::{time::{self, Duration}, runtime::Runtime};
 
 use crate::constants::{CONFIG_FILE, TIMED};
 use crate::error::OfferingError;
@@ -16,6 +16,7 @@ use crate::methods::{
     format_usize,
     chromedriver_process, 
     parse_queries,
+    annoy,
     single_offering,
     multiple_offerings, 
 };
@@ -129,6 +130,38 @@ impl SeatFinder {
                 panic!("Error clearing the timetable: {}", e);
             }
         }
+    }
+
+    pub async fn seats_are_available(&self) -> bool {
+        let mut availability = false;
+        for query in self.queries.iter() {
+            let interactees = match self.locate_interactees().await {
+                Ok(interactees) => interactees,
+                Err(_) => continue,
+            };
+
+            if let Err(_) = self.toggle_advanced_filter(query).await {
+                continue;
+            }
+            if let Err(_) = self.search_timetable(&interactees, query).await {
+                continue;
+            }
+            if let Err(_) = self.select_unit(query).await {
+                continue;
+            }
+            
+            if let Ok(opt) = self.search_query(&interactees, query).await {
+                match opt {
+                    Some(allocation) => {
+                        allocation.notify_query_resolved(query.unit_code());
+                        availability = true;
+                    },
+                    None => println!("No allocations found for {} matching the given query.", query.unit_code()),
+                }
+            }
+        }
+
+        availability
     }
 
     pub async fn quit(self) {
@@ -284,4 +317,31 @@ pub fn run() {
     if let Some(instant) = start {
         println!("Program took {:.2?} seconds to execute", instant.elapsed());
     }
+}
+
+pub fn run_every(milliseconds: u64) {
+    let rt = Runtime::new().unwrap();
+
+    rt.block_on(async {
+        let duration = Duration::from_millis(milliseconds);
+        let seatfinder = SeatFinder::new().await;
+
+        let mut timer = time::interval(duration);
+        timer.tick().await;
+
+        loop {
+            timer.tick().await;
+            if !seatfinder.seats_are_available().await {
+                continue;
+            }
+
+            match seatfinder.config.music {
+                Some(ref path) => {
+                    println!("Playing '{}'", path.file_name().unwrap().to_str().unwrap());
+                    annoy(path);
+                },
+                None => println!("No music to play :("),
+            }
+        }
+    });
 }

@@ -1,10 +1,13 @@
-use std::error::Error;
+use std::io::BufReader;
 use std::fs::File;
+use std::error::Error;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::net::TcpListener;
 
 use serde_json::{self, Value};
 use chrono::Datelike;
+use rodio::Source;
 
 use crate::constants::{
     CONFIG_FILE, 
@@ -88,6 +91,15 @@ pub fn unoccupied_port(start: u16) -> u16 {
             Err(_) => port += 1,
         }
     }
+}
+
+pub fn annoy(path: &PathBuf) {
+    let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+    let file = BufReader::new(File::open(path).unwrap());
+    let source = rodio::Decoder::new_mp3(file).unwrap();
+    stream_handle.play_raw(source.convert_samples()).unwrap();
+
+    loop {}
 }
 
 pub fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<dyn Error>> {
