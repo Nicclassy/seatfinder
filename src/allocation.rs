@@ -2,12 +2,13 @@ use std::error::Error;
 use std::collections::HashMap;
 use std::fmt;
 
+use colored::Colorize;
 use strum::{Display, IntoStaticStr};
 
-use crate::constants::{SEMESTER_KEY_RE, TWELVE_HOUR_TIME_RE};
+use crate::consts::{SEMESTER_KEY_RE, TWELVE_HOUR_TIME_RE};
 use crate::error::{ParseError, TableError};
 
-pub type AllocationResult = Result<Option<Allocation>, Box<dyn Error>>;
+pub(crate) type AllocationResult = Result<Option<Allocation>, Box<dyn Error>>;
 
 #[derive(Debug)]
 pub struct TwentyFourHourTime {
@@ -207,6 +208,7 @@ impl TryFrom<&str> for Day {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Allocation {
     pub activity_type: ActivityType,
@@ -223,7 +225,7 @@ pub struct Allocation {
 
     pub duration: String,
     pub weeks: String,
-    pub seats: u16,
+    pub seats: i16,
 }
 
 fn allocation_table_get(map: &HashMap<String, String>, key: &str) -> Result<String, TableError> {
@@ -255,7 +257,7 @@ impl Allocation {
 
         let duration = allocation_table_get(&table, "Duration")?;
         let weeks = allocation_table_get(&table, "Weeks")?;
-        let seats = allocation_table_get(&table, "Seats")?.parse::<u16>()?;
+        let seats = allocation_table_get(&table, "Seats")?.parse::<i16>()?;
 
         Ok(Allocation {
             activity_type,
@@ -274,6 +276,7 @@ impl Allocation {
     }
 
     pub fn notify_query_resolved(&self, unit_code: String) {
-        println!("Activity {} of {} has {} seats left", self.activity, unit_code, self.seats);
+        let resolved = format!("Activity {} of {} has {} seats left", self.activity, unit_code, self.seats);
+        println!("{}", resolved.green());
     }
 }

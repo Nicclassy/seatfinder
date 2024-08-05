@@ -4,11 +4,13 @@ use std::io::BufReader;
 use std::time::Instant;
 use std::process::Child;
 
+use colored::{self, Colorize};
+use chrono;
 use serde_json::{self, Value};
 use thirtyfour::prelude::*;
 use tokio::{time::{self, Duration}, runtime::Runtime};
 
-use crate::constants::{CONFIG_FILE, TIMED};
+use crate::consts::{CONFIG_FILE, TIMED};
 use crate::error::OfferingError;
 use crate::query::{FinderQuery, FinderConfig};
 use crate::methods::{
@@ -132,22 +134,22 @@ impl SeatFinder {
         }
     }
 
-    pub async fn seats_are_available(&self) -> bool {
+    pub async fn seats_are_available(&self) -> Option<bool> {
         let mut availability = false;
         for query in self.queries.iter() {
             let interactees = match self.locate_interactees().await {
                 Ok(interactees) => interactees,
-                Err(_) => continue,
+                Err(_) => return None,
             };
 
             if let Err(_) = self.toggle_advanced_filter(query).await {
-                continue;
+                return None;
             }
             if let Err(_) = self.search_timetable(&interactees, query).await {
-                continue;
+                return None;
             }
             if let Err(_) = self.select_unit(query).await {
-                continue;
+                return None;
             }
             
             if let Ok(opt) = self.search_query(&interactees, query).await {
@@ -159,9 +161,11 @@ impl SeatFinder {
                     None => println!("No allocations found for {} matching the given query.", query.unit_code()),
                 }
             }
+
+            let _ = self.reset_timetable().await;
         }
 
-        availability
+        Some(availability)
     }
 
     pub async fn quit(self) {
@@ -319,25 +323,43 @@ pub fn run() {
     }
 }
 
-pub fn run_every(milliseconds: u64) {
+pub fn run_every(seconds: u64) {
     let rt = Runtime::new().unwrap();
 
     rt.block_on(async {
-        let duration = Duration::from_millis(milliseconds);
+        let duration = Duration::from_secs(seconds);
         let seatfinder = SeatFinder::new().await;
 
         let mut timer = time::interval(duration);
-        timer.tick().await;
 
         loop {
             timer.tick().await;
-            if !seatfinder.seats_are_available().await {
-                continue;
+
+            let now = chrono::Local::now();
+            let formatted = format!("{}: Seatfinding", now.format("[%d/%m/%y %H:%M:%S]"));
+            println!("{}", formatted.red());
+
+            match seatfinder.seats_are_available().await {
+                Some(false) => continue,
+                None => {
+                    let now = chrono::Local::now();
+                    let formatted = format!("{}: Refreshing page...", now.format("[%d/%m/%y %H:%M:%S]"));
+                    println!("{}", formatted.cyan());
+
+                    seatfinder.driver.refresh().await.unwrap();
+                    continue;
+                }
+                _ => {},
             }
 
             match seatfinder.config.music {
                 Some(ref path) => {
-                    println!("Playing '{}'", path.file_name().unwrap().to_str().unwrap());
+                    let file_name = path
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap();
+                    println!("Playing '{}'", file_name);
                     annoy(path);
                 },
                 None => println!("No music to play :("),

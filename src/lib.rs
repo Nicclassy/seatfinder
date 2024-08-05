@@ -1,4 +1,4 @@
-mod constants;
+mod consts;
 mod error;
 #[macro_use]
 mod macros;

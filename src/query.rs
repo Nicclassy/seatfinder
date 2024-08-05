@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde_json::{self, Value};
 
 use crate::allocation::{ActivityType, Day, Semester, TwentyFourHourTime};
-use crate::constants::{
+use crate::consts::{
     DEFAULT_HEADLESS, 
     DEFAULT_PORT, 
     DEFAULT_RUN_CHROMEDRIVER, 
@@ -31,6 +31,7 @@ const UNIT_CODE: &'static str = "unit_code";
 const SEMESTER: &'static str = "semester";
 const DAY: &'static str = "day";
 const START_AFTER: &'static str = "start_after";
+const START: &'static str = "start";
 const ACTIVITIY_TYPE: &'static str = "activity_type";
 const ACTIVITY: &'static str = "activity";
 
@@ -71,10 +72,9 @@ impl FinderQuery {
         )?;
         let activity = config[ACTIVITY].as_u64().ok_or(ParseError::ParseJsonError)?;
 
-
         let start_after = match config[START_AFTER].as_str() {
             Some(value) => TwentyFourHourTime::new(value),
-            None => None,
+            None => config[START].as_str().and_then(|value| TwentyFourHourTime::new(value)),
         };
 
         Ok(FinderQuery { 

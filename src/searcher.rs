@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use thirtyfour::prelude::*;
 
-use crate::constants::ROWS_IN_TABLE;
+use crate::consts::ROWS_IN_TABLE;
 use crate::error::{TableRowError, TableError};
 use crate::methods::format_u64;
 use crate::query::FinderQuery;
