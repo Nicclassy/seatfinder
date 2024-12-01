@@ -7,7 +7,7 @@ pub enum TableRowError {
     #[error("error querying or processing an element")]
     WebElementError,
     #[error("row key is empty")]
-    MissingKeyError,
+    MissingKey,
     #[error("table row should have 2 elements but has {} elements instead", .0)]
     RowSizeError(usize),
 }
@@ -41,7 +41,7 @@ pub enum ParseError {
     #[error("an invalid query was encountered.")]
     ParseQueriesError,
     #[error("regex {:?} did not match {:?}", .0, .1)]
-    RegexNoMatchError(&'static str, String),
+    RegexNoMatch(&'static str, String),
 }
 
 #[derive(Error, Debug)]
@@ -49,7 +49,7 @@ pub enum OfferingError {
     #[error("offering {:?} in semester {:?} is improperly formatted", .0, .1)]
     SemesterFormatError(String, String),
     #[error("expected semester {expected}, found semester {actual}")]
-    SemesterInvalidError { expected: Semester, actual: Semester },
+    SemesterInvalid { expected: Semester, actual: Semester },
     #[error("no offerings found for {:?}", .0)]
     NoOfferingsError(String),
     #[error("no valid sessions found for {:?}", .0)]

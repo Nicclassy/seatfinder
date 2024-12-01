@@ -4,6 +4,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::net::TcpListener;
+use std::thread;
 
 use serde_json::{self, Value};
 use chrono::Datelike;
@@ -22,21 +23,21 @@ use crate::allocation::Semester;
 use crate::query::FinderQuery;
 use crate::error::{ParseError, OfferingError};
 
-const QUERY: &'static str = "query";
-const QUERIES: &'static str = "queries";
+const QUERY: &str = "query";
+const QUERIES: &str = "queries";
 
-pub fn format_u64(src: &str, value: u64) -> String {
+pub fn format_u64(fmt: &str, value: u64) -> String {
     // Workaround for lack of runtime variadic .format method in C#/C/Python/Java etc.
     // Not the cleanest solution but obeys the orphan rule
-    src.replacen("{}", &value.to_string(), 1)
+    fmt.replacen("{}", &value.to_string(), 1)
 }
 
-pub fn format_usize(src: &str, value: usize) -> String {
-    src.replacen("{}", &value.to_string(), 1)
+pub fn format_usize(fmt: &str, value: usize) -> String {
+    fmt.replacen("{}", &value.to_string(), 1)
 }
 
-pub fn format_str(src: &str, value: &str) -> String {
-    src.replacen("{}", value, 1)
+pub fn format_str(fmt: &str, value: &str) -> String {
+    fmt.replacen("{}", value, 1)
 }
 
 pub fn chromedriver_process(port: u16) -> Result<Child, std::io::Error> {
@@ -51,18 +52,15 @@ pub fn parse_queries() -> Result<Vec<FinderQuery>, Box<dyn Error>> {
     let file = File::open(CONFIG_FILE)?;
     let json_config: Value = serde_json::from_reader(file)?;
 
-    match json_config[QUERY].as_object() {
-        Some(_) => {
-            let query = FinderQuery::try_new(&json_config[QUERY])?;
-            return Ok(vec![query]);
-        }
-        None => {},
+    if json_config[QUERY].as_object().is_some() {
+        let query = FinderQuery::try_new(&json_config[QUERY])?;
+        return Ok(vec![query]);
     };
 
     let queries: Vec<FinderQuery> = json_config[QUERIES]
         .as_array()
         .ok_or(ParseError::ParseQueriesError)?
-        .into_iter()
+        .iter()
         .map(FinderQuery::try_new)
         .collect::<Result<_, _>>()?;
     Ok(queries)
@@ -99,15 +97,17 @@ pub fn annoy(path: &PathBuf) {
     let source = rodio::Decoder::new_mp3(file).unwrap();
     stream_handle.play_raw(source.convert_samples()).unwrap();
 
-    loop {}
+    loop {
+        thread::sleep(std::time::Duration::from_millis(1));
+    }
 }
 
 pub fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<dyn Error>> {
     let Some((_, [unit_code, session])) = 
-        SUBCODE_RE.captures(&subcode).map(|caps| caps.extract()) else {
+        SUBCODE_RE.captures(subcode).map(|caps| caps.extract()) else {
             return Err(
                 Box::new(
-                    ParseError::RegexNoMatchError(
+                    ParseError::RegexNoMatch(
                         SUBCODE_RE.as_str(), 
                         subcode.to_string()
                     )
@@ -137,7 +137,7 @@ pub fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<
         },
         None => return Err(
             Box::new(
-                ParseError::RegexNoMatchError(
+                ParseError::RegexNoMatch(
                     SEMESTER_RE.as_str(), 
                     session.to_string()
                 )
@@ -151,7 +151,7 @@ pub fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<
         true => Ok(()),
         false => Err(
             Box::new(
-                OfferingError::SemesterInvalidError { 
+                OfferingError::SemesterInvalid { 
                     expected: query.semester.clone(), 
                     actual: semester 
                 } 
@@ -162,7 +162,7 @@ pub fn single_offering(query: &FinderQuery, subcode: &String) -> Result<(), Box<
 
 pub fn multiple_offerings(
     query: &FinderQuery, 
-    subcodes: &Vec<String>, 
+    subcodes: &[String], 
 ) -> Option<usize> {
     subcodes
         .iter()

@@ -17,10 +17,10 @@ pub const DEFAULT_PORT: u16 = 9515;
 
 pub const MIN_PORT: u16 = 1024;
 pub const MAX_PORT: u16 = 65535;
-pub const LOCALHOST: &'static str = "127.0.0.1";
+pub const LOCALHOST: &str = "127.0.0.1";
 
-pub const CONFIG_FILE: &'static str = "config.json";
+pub const CONFIG_FILE: &str = "config.json";
 pub const ROWS_IN_TABLE: usize = 12;
 
-pub const PUBLIC_TIMETABLE_ODD: &'static str = "https://timetable.sydney.edu.au/odd/timetable/#subjects";
-pub const PUBLIC_TIMETABLE_EVEN: &'static str = "https://timetable.sydney.edu.au/even/timetable/#subjects";
+pub const PUBLIC_TIMETABLE_ODD: &str = "https://timetable.sydney.edu.au/odd/timetable/#subjects";
+pub const PUBLIC_TIMETABLE_EVEN: &str = "https://timetable.sydney.edu.au/even/timetable/#subjects";

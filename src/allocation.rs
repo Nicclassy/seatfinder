@@ -8,7 +8,7 @@ use strum::{Display, IntoStaticStr};
 use crate::consts::{SEMESTER_KEY_RE, TWELVE_HOUR_TIME_RE};
 use crate::error::{ParseError, TableError};
 
-pub(crate) type AllocationResult = Result<Option<Allocation>, Box<dyn Error>>;
+pub type AllocationResult = Result<Option<Allocation>, Box<dyn Error>>;
 
 #[derive(Debug)]
 pub struct TwentyFourHourTime {
@@ -89,16 +89,15 @@ impl TryFrom<String> for Semester {
     type Error = ParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.parse::<u64>() {
-            Ok(semester) => return Self::try_from(semester),
-            Err(_) => {{}},
+        if let Ok(semester) = value.parse::<u64>() { 
+            return Self::try_from(semester) 
         }
         
         let Some(caps) = SEMESTER_KEY_RE.captures(&value) else {
             return Err(ParseError::ParseSemesterStrError(value));
         };
 
-        match (&caps[1]).parse::<u64>() {
+        match caps[1].parse::<u64>() {
             Ok(semester) => Self::try_from(semester),
             Err(e) => Err(
                 ParseError::ParseSemesterStrError(e.to_string())
@@ -235,29 +234,29 @@ fn allocation_table_get(map: &HashMap<String, String>, key: &str) -> Result<Stri
 impl Allocation {
     pub fn try_new(table: &HashMap<String, String>) -> Result<Allocation, Box<dyn Error>> {
         let activity_type = ActivityType::try_from(
-            allocation_table_get(&table, "Activity Type")?.as_str()
+            allocation_table_get(table, "Activity Type")?.as_str()
         )?;
 
-        let group = allocation_table_get(&table, "Group")?;
-        let activity = allocation_table_get(&table, "Activity")?.parse::<u64>()?;
-        let description = allocation_table_get(&table, "Description")?;
+        let group = allocation_table_get(table, "Group")?;
+        let activity = allocation_table_get(table, "Activity")?.parse::<u64>()?;
+        let description = allocation_table_get(table, "Description")?;
 
         let day = Day::try_from(
-            allocation_table_get(&table, "Day")?.as_str()
+            allocation_table_get(table, "Day")?.as_str()
         )?;
-        let time_string = allocation_table_get(&table, "Time")?;
+        let time_string = allocation_table_get(table, "Time")?;
         let time = TwentyFourHourTime::new(&time_string)
             .ok_or(ParseError::ParseTimeError(time_string))?;
 
         let semester = Semester::try_from(
-            allocation_table_get(&table, "Semester")?
+            allocation_table_get(table, "Semester")?
         )?;
-        let campus = allocation_table_get(&table, "Campus")?;
-        let location = allocation_table_get(&table, "Location")?;
+        let campus = allocation_table_get(table, "Campus")?;
+        let location = allocation_table_get(table, "Location")?;
 
-        let duration = allocation_table_get(&table, "Duration")?;
-        let weeks = allocation_table_get(&table, "Weeks")?;
-        let seats = allocation_table_get(&table, "Seats")?.parse::<i16>()?;
+        let duration = allocation_table_get(table, "Duration")?;
+        let weeks = allocation_table_get(table, "Weeks")?;
+        let seats = allocation_table_get(table, "Seats")?.parse::<i16>()?;
 
         Ok(Allocation {
             activity_type,

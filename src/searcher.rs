@@ -58,7 +58,7 @@ impl<'a> TimetableSearcher<'a> {
                     match (first, second) {
                         (Ok(table_key), Ok(table_value)) => {
                             if table_key.is_empty() {
-                                Err(TableRowError::MissingKeyError)
+                                Err(TableRowError::MissingKey)
                             } else {
                                 allocation_table.insert(table_key, table_value);
                                 Ok(())
@@ -82,11 +82,11 @@ impl<'a> TimetableSearcher<'a> {
             match row_error {
                 TableRowError::WebElementError | TableRowError::RowSizeError(_) => {
                     self.go_back_to_timetable().await?;
-                    let event = self.timetabled_event(&timetable_column, timetable_row).await?;
+                    let event = self.timetabled_event(timetable_column, timetable_row).await?;
                     event.click().await?;
                     table_rows = self.table_rows().await?;
                 }
-                TableRowError::MissingKeyError => {}
+                TableRowError::MissingKey => {}
             }
         }
 
@@ -108,12 +108,12 @@ impl<'a> TimetableSearcher<'a> {
             .first()
             .await?;
 
-        Ok(go_back_button.click().await?)
+        go_back_button.click().await
     }
 
     #[inline]
     async fn timetabled_event(&self, timetable_column: &str, timetable_row: u64) -> WebDriverResult<WebElement> {
-        let by = By::XPath(format_u64(&timetable_column, timetable_row));
+        let by = By::XPath(format_u64(timetable_column, timetable_row));
         self.driver.query(by).first().await
     }
 

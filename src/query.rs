@@ -21,19 +21,19 @@ use crate::methods::{
     unoccupied_port
 };
 
-const HEADLESS: &'static str = "headless";
-const PORT: &'static str = "port";
-const PARITY: &'static str = "parity";
-const RUN_CHROMEDRIVER: &'static str = "run_chromedriver";
-const MUSIC: &'static str = "music";
+const HEADLESS: &str = "headless";
+const PORT: &str = "port";
+const PARITY: &str = "parity";
+const RUN_CHROMEDRIVER: &str = "run_chromedriver";
+const MUSIC: &str = "music";
 
-const UNIT_CODE: &'static str = "unit_code";
-const SEMESTER: &'static str = "semester";
-const DAY: &'static str = "day";
-const START_AFTER: &'static str = "start_after";
-const START: &'static str = "start";
-const ACTIVITIY_TYPE: &'static str = "activity_type";
-const ACTIVITY: &'static str = "activity";
+const UNIT_CODE: &str = "unit_code";
+const SEMESTER: &str = "semester";
+const DAY: &str = "day";
+const START_AFTER: &str = "start_after";
+const START: &str = "start";
+const ACTIVITIY_TYPE: &str = "activity_type";
+const ACTIVITY: &str = "activity";
 
 #[derive(Debug)]
 pub struct FinderQuery {
@@ -52,7 +52,7 @@ impl FinderQuery {
             .ok_or(ParseError::ParseJsonError)?
             .to_string();
         if !UNIT_CODE_RE.is_match(unit_code.as_str()) {
-            return Err(ParseError::RegexNoMatchError(SUBCODE_RE.as_str(), unit_code));
+            return Err(ParseError::RegexNoMatch(SUBCODE_RE.as_str(), unit_code));
         }
         let day = match config[DAY].as_u64() {
             Some(value) => Day::try_from(value)?,
@@ -74,7 +74,7 @@ impl FinderQuery {
 
         let start_after = match config[START_AFTER].as_str() {
             Some(value) => TwentyFourHourTime::new(value),
-            None => config[START].as_str().and_then(|value| TwentyFourHourTime::new(value)),
+            None => config[START].as_str().and_then(TwentyFourHourTime::new),
         };
 
         Ok(FinderQuery { 
@@ -123,7 +123,7 @@ impl FinderConfig {
             None => DEFAULT_PORT,
         };
 
-        if port < MIN_PORT || port > MAX_PORT {
+        if !(MIN_PORT..=MAX_PORT).contains(&port) {
             return Err(ParseError::ParseJsonError);
         }
 

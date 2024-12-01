@@ -4,9 +4,9 @@ macro_rules! selector {
         #[derive(Clone, Copy)]
         pub struct $selector_name(&'static str);
 
-        impl Into<String> for $selector_name {
-            fn into(self) -> String {
-                self.0.to_owned()
+        impl From<$selector_name> for String {
+            fn from(selector: $selector_name) -> String {
+                selector.0.to_owned()
             }
         }
 

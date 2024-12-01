@@ -120,7 +120,7 @@ impl SeatFinder {
                 panic!("Error selecting the unit offering: {}", e);
             }
         
-            match self.search_query(&interactees, query).await {
+            match self.search_query(&interactees.show_timetable_button, query).await {
                 Ok(opt) => match opt {
                     Some(allocation) => allocation.notify_query_resolved(query.unit_code()),
                     None => println!("No allocations found for {} matching the given query.", query.unit_code()),
@@ -142,17 +142,11 @@ impl SeatFinder {
                 Err(_) => return None,
             };
 
-            if let Err(_) = self.toggle_advanced_filter(query).await {
-                return None;
-            }
-            if let Err(_) = self.search_timetable(&interactees, query).await {
-                return None;
-            }
-            if let Err(_) = self.select_unit(query).await {
-                return None;
-            }
+            self.toggle_advanced_filter(query).await.ok()?;
+            self.search_timetable(&interactees, query).await.ok()?;
+            self.select_unit(query).await.ok()?;
             
-            if let Ok(opt) = self.search_query(&interactees, query).await {
+            if let Ok(opt) = self.search_query(&interactees.show_timetable_button, query).await {
                 match opt {
                     Some(allocation) => {
                         allocation.notify_query_resolved(query.unit_code());
@@ -162,7 +156,7 @@ impl SeatFinder {
                 }
             }
 
-            let _ = self.reset_timetable().await;
+            self.reset_timetable().await.ok()?;
         }
 
         Some(availability)
@@ -195,7 +189,7 @@ impl SeatFinder {
         if let Some(ref start_time) = query.start_after {
             // For some reason, the start time must be entered as one hour ahead of the actual start time
             // so as to exclude prior allocations
-            let script = format!("document.getElementById('{}').value = '{}';", START_TIME, start_time.progress_one_hour());
+            let script = format!("document.getElementById('{START_TIME}').value = '{}';", start_time.progress_one_hour());
             self.driver.execute(script, Vec::new()).await?;
         }
 
@@ -214,11 +208,15 @@ impl SeatFinder {
         Ok(())
     }
 
-    async fn search_timetable(&self, interactees: &Interactees, query: &FinderQuery) -> WebDriverResult<()> {
-        interactees.search_bar.clear().await?;
-        interactees.search_bar.send_keys(&query.unit_code).await?;
-        interactees.search_button.wait_until().clickable().await?;
-        Ok(interactees.search_button.click().await?)
+    async fn search_timetable(
+        &self, 
+        Interactees { search_bar, search_button, show_timetable_button: _ }: &Interactees, 
+        query: &FinderQuery
+    ) -> WebDriverResult<()> {
+        search_bar.clear().await?;
+        search_bar.send_keys(&query.unit_code).await?;
+        search_button.wait_until().clickable().await?;
+        search_button.click().await
     }
 
     async fn select_unit(&self, query: &FinderQuery) -> Result<(), Box<dyn Error>> {
@@ -242,8 +240,6 @@ impl SeatFinder {
             ),
         };
 
-        // For some strange reason, the checkbox (for the offering) does not need to be clicked
-        // to show allocations when the starting after value is modified
         if subcodes.len() == 1 {
             return match single_offering(query, first_offering) {
                 Ok(()) => {
@@ -271,11 +267,11 @@ impl SeatFinder {
         }
     }
 
-    async fn search_query(&self, interactees: &Interactees, query: &FinderQuery) -> AllocationResult {
-        interactees.show_timetable_button.click().await?;
+    async fn search_query(&self, show_timetable_button: &WebElement, query: &FinderQuery) -> AllocationResult {
+        show_timetable_button.click().await?;
 
         let searcher = TimetableSearcher::new(&self.driver, query);
-        Ok(searcher.search().await?)
+        searcher.search().await
     }
 
     async fn reset_timetable(&self) -> WebDriverResult<()> {
@@ -286,7 +282,7 @@ impl SeatFinder {
 
     async fn clear_timetable(&self) -> WebDriverResult<()> {
         let clear_button = self.query_by_xpath(CLEAR_BUTTON).await?;
-        Ok(clear_button.click().await?)
+        clear_button.click().await
     }
 
     async fn reselect_all(&self) -> WebDriverResult<()> {
@@ -300,7 +296,7 @@ impl SeatFinder {
             .query(by)
             .first()
             .await?;
-        Ok(activity_checkbox.click().await?)
+        activity_checkbox.click().await
     }
 
     #[inline]
