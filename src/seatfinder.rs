@@ -4,6 +4,8 @@ use std::io::BufReader;
 use std::time::Instant;
 use std::process::Child;
 
+use env_logger;
+use log::info;
 use colored::{self, Colorize};
 use chrono;
 use serde_json::{self, Value};
@@ -98,7 +100,7 @@ impl SeatFinder {
 
     pub async fn seatfind(&self) {   
         if self.queries.is_empty() {
-            println!("No queries to find.");
+            info!("No queries to find.");
             return;
         } 
 
@@ -123,7 +125,7 @@ impl SeatFinder {
             match self.search_query(&interactees.show_timetable_button, query).await {
                 Ok(opt) => match opt {
                     Some(allocation) => allocation.notify_query_resolved(query.unit_code()),
-                    None => println!("No allocations found for {} matching the given query.", query.unit_code()),
+                    None => info!("No allocations found for {} matching the given query.", query.unit_code()),
                 }
                 Err(e) => panic!("Error searching for the query: {}", e)
             }
@@ -152,7 +154,7 @@ impl SeatFinder {
                         allocation.notify_query_resolved(query.unit_code());
                         availability = true;
                     },
-                    None => println!("No allocations found for {} matching the given query.", query.unit_code()),
+                    None => info!("No allocations found for {} matching the given query.", query.unit_code()),
                 }
             }
 
@@ -306,6 +308,8 @@ impl SeatFinder {
 }
 
 pub fn run() {
+    env_logger::init();
+
     let rt = Runtime::new().unwrap();
     let start = if TIMED { Some(Instant::now()) } else { None };
     
@@ -315,11 +319,13 @@ pub fn run() {
         seatfinder.quit().await;
     });
     if let Some(instant) = start {
-        println!("Program took {:.2?} seconds to execute", instant.elapsed());
+        info!("Program took {:.2?} seconds to execute", instant.elapsed());
     }
 }
 
 pub fn run_every(seconds: u64) {
+    env_logger::init();
+
     let rt = Runtime::new().unwrap();
 
     rt.block_on(async {
@@ -333,14 +339,14 @@ pub fn run_every(seconds: u64) {
 
             let now = chrono::Local::now();
             let formatted = format!("{}: Seatfinding", now.format("[%d/%m/%y %H:%M:%S]"));
-            println!("{}", formatted.red());
+            info!("{}", formatted.red());
 
             match seatfinder.seats_are_available().await {
                 Some(false) => continue,
                 None => {
                     let now = chrono::Local::now();
                     let formatted = format!("{}: Refreshing page...", now.format("[%d/%m/%y %H:%M:%S]"));
-                    println!("{}", formatted.cyan());
+                    info!("{}", formatted.cyan());
 
                     seatfinder.driver.refresh().await.unwrap();
                     continue;
@@ -355,10 +361,10 @@ pub fn run_every(seconds: u64) {
                         .unwrap()
                         .to_str()
                         .unwrap();
-                    println!("Playing '{}'", file_name);
+                    info!("Playing '{}'", file_name);
                     annoy(path);
                 },
-                None => println!("No music to play :("),
+                None => info!("No music to play :("),
             }
         }
     });
